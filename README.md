@@ -1,170 +1,185 @@
-# 🎮 Pixel Platformer
+# 🎮 像素平台跳跃游戏
 
-A retro-style 2D platformer game inspired by classic 8-bit/16-bit games, built with Phaser 3 and TypeScript.
+一款基于 Phaser 3 和 TypeScript 开发的复古风格 2D 平台跳跃游戏，灵感来自经典的 8-bit/16-bit 游戏。
 
-![Game Style](https://img.shields.io/badge/Style-Pixel%20Art-blue)
-![Engine](https://img.shields.io/badge/Engine-Phaser%203-green)
-![Language](https://img.shields.io/badge/Language-TypeScript-blue)
+![游戏风格](https://img.shields.io/badge/风格-像素艺术-blue)
+![引擎](https://img.shields.io/badge/引擎-Phaser%203-green)
+![语言](https://img.shields.io/badge/语言-TypeScript-blue)
 
-## 🌟 Features
+## 🌟 游戏特色
 
-### 🎨 Classic Retro Style
-- **8-bit pixel art** graphics generated programmatically
-- **FC-era** inspired visual design with nostalgic blue sky background
-- **Smooth scrolling** camera system for classic platformer feel
+### 🎨 经典复古风格
+- **8位像素艺术**图形，完全由程序生成
+- **FC时代**风格设计，怀旧的蓝天背景
+- **流畅滚动**的镜头系统，经典平台跳跃手感
 
-### 👥 Dual Player Mode
-- **Player 1 (Sonic)**: Blue hedgehog with red shoes
-  - Controls: Arrow keys + Space/↑ to jump
-- **Player 2 (Shadow)**: Black hedgehog with red stripes
-  - Controls: WASD + Shift/W to jump
+### 👥 三人模式
+- **玩家1（索尼克）**: 蓝色刺猬，红色鞋子
+  - 操作：方向键移动 + 空格/↑跳跃 + F键飞行
+- **玩家2（夏特）**: 黑色刺猬，红色条纹
+  - 操作：WASD移动 + Shift/W跳跃
+- **玩家3（艾米）**: 粉色刺猬
+  - 操作：小键盘4568移动 + 小键盘0跳跃
 
-### 🎯 Gameplay Elements
-- ✨ **Collectible Coins**: Gather all coins to spawn new ones
-- 🍄 **Ground Enemies**: Mushroom-like enemies that patrol platforms
-- 🔥 **Fire Enemies**: Flying dragon enemies that shoot fireballs
-- 🏆 **Score System**: 
-  - Coins: +10 points
-  - Stomp enemy: +20 points
-  - Defeat fire enemy: +50 points
-- ❤️ **Lives System**: Start with 3 lives
-- 🎮 **Multiplayer**: Cooperative gameplay with camera following both players
+### 🎯 游戏元素
+- ✨ **收集金币**: 收集所有金币即可胜利
+- 🍄 **地面敌人**: 蘑菇状敌人在平台上巡逻
+- 🔥 **飞行敌人**: 会喷火的飞龙敌人，发射追踪火球
+- 🏆 **计分系统**: 
+  - 金币：+10分
+  - 踩踏敌人：+20分
+  - 击败火龙：+50分
+- ❤️ **生命系统**: 初始3条生命
+- 🎮 **多人协作**: 镜头跟随三个玩家的中心点
+- ⚡ **移动平台**: 第二层和第四层各有2个会左右移动的平台
+- 🛡️ **无敌光盾**: 带有彩色雷电特效的防护罩
 
-### 🌍 World Design
-- **Multi-layered platforms** with varying heights
-- **Vertical scrolling** up to 1200px height
-- **Physics-based** movement with gravity and collision detection
-- **Dynamic difficulty**: More enemies spawn as you progress
+### 🌍 世界设计
+- **多层平台**设计，高度各异
+- **垂直滚动**高度达1200像素
+- **物理引擎**驱动的移动、重力和碰撞检测
+- **动态难度**: 随着游戏进行出现更多敌人
 
-## 🚀 Getting Started
+### 🎮 秘籍系统
+- **131119**: 直接显示胜利画面
+- **131120**: 所有角色获得10秒无敌光盾（带雷电特效）
 
-### Prerequisites
-- Node.js (v16 or higher)
-- npm or yarn
+## 🚀 开始使用
 
-### Installation
+### 环境要求
+- Node.js (v16 或更高版本)
+- npm 或 yarn
 
-1. Clone the repository:
+### 安装步骤
+
+1. 克隆仓库：
 ```bash
 git clone <repository-url>
 cd pixel-platformer
 ```
 
-2. Install dependencies:
+2. 安装依赖：
 ```bash
 npm install
 ```
 
-3. Start the development server:
+3. 启动开发服务器：
 ```bash
 npm run dev
 ```
 
-4. Open your browser and navigate to the local server URL (usually `http://localhost:5173`)
+4. 打开浏览器访问本地服务器地址（通常是 `http://localhost:5173`）
 
-### Build for Production
+### 生产环境构建
 
 ```bash
 npm run build
 ```
 
-The built files will be in the `dist` directory.
+构建后的文件将在 `dist` 目录中。
 
-## 🎮 How to Play
+## 🎮 玩法说明
 
-### Controls
+### 操作方式
 
-#### Player 1 (Blue Sonic)
-- **Left/Right Arrow**: Move
-- **Up Arrow or Space**: Jump
+#### 玩家1（蓝色索尼克）
+- **左/右方向键**: 移动
+- **↑方向键或空格**: 跳跃
+- **F键**: 飞行（长按）
 
-#### Player 2 (Black Shadow)
-- **A/D**: Move left/right
-- **W or Shift**: Jump
+#### 玩家2（黑色夏特）
+- **A/D**: 左右移动
+- **W或Shift**: 跳跃
 
-### Objective
-- Collect all the golden coins
-- Avoid or stomp on enemies
-- Don't fall off the platforms
-- Survive with your 3 lives
-- Achieve the highest score possible!
+#### 玩家3（粉色艾米）
+- **小键盘4/6**: 左右移动
+- **小键盘8或0**: 跳跃
 
-### Tips
-- 💡 You can stomp enemies by jumping on them from above
-- 💡 Fire enemies shoot homing fireballs - keep moving!
-- 💡 Stomping fire enemies gives you more points
-- 💡 When you collect all coins, new ones appear with more enemies
-- 💡 Press **R** to restart after game over
+### 游戏目标
+- 收集所有金币获得胜利
+- 避开或踩踏敌人
+- 不要掉下平台
+- 用3条生命坚持到最后
+- 争取最高分数！
 
-## 🛠️ Technology Stack
+### 游戏技巧
+- 💡 可以从上方跳到敌人头上来踩踏它们
+- 💡 火龙会发射追踪火球 - 保持移动！
+- 💡 踩踏火龙可以获得更多分数
+- 💡 移动平台上的角色和金币会随平台一起移动
+- 💡 输入秘籍可以激活特殊效果
+- 💡 游戏结束或胜利后按 **R** 键重新开始
 
-- **Game Engine**: [Phaser 3](https://phaser.io/) (v3.90.0)
-- **Language**: TypeScript
-- **Build Tool**: Vite
-- **Graphics**: Procedurally generated pixel art (no external assets needed)
-- **Physics**: Phaser Arcade Physics
+## 🛠️ 技术栈
 
-## 📁 Project Structure
+- **游戏引擎**: [Phaser 3](https://phaser.io/) (v3.90.0)
+- **开发语言**: TypeScript
+- **构建工具**: Vite
+- **图形渲染**: 程序化生成的像素艺术（无需外部素材）
+- **物理引擎**: Phaser Arcade Physics
+
+## 📁 项目结构
 
 ```
 pixel-platformer/
-├── public/              # Static assets
+├── public/              # 静态资源
 ├── src/
 │   ├── scenes/
-│   │   └── MainScene.ts # Main game scene
-│   ├── main.ts          # Game initialization
-│   └── style.css        # Styling
-├── index.html           # Entry HTML
-├── package.json         # Dependencies
-└── tsconfig.json        # TypeScript config
+│   │   └── CoinChaserScene.ts # 金币收集平台跳跃游戏
+│   ├── main.ts          # 游戏初始化
+│   └── style.css        # 样式文件
+├── index.html           # 入口HTML
+├── package.json         # 依赖配置
+└── tsconfig.json        # TypeScript配置
 ```
 
-## 🎨 Game Assets
+## 🎨 游戏资源
 
-All visual assets are **generated programmatically** using Phaser's Graphics API:
-- Player sprites (Sonic & Shadow)
-- Platform textures with grass details
-- Enemy sprites (mushrooms & fire dragons)
-- Coin animations
-- Fireball effects
+所有视觉资源均使用 Phaser 的 Graphics API **程序化生成**：
+- 玩家精灵（索尼克、夏特、艾米）
+- 平台纹理（带草地细节）
+- 敌人精灵（蘑菇和火龙）
+- 金币动画
+- 火球特效
+- 无敌光盾和雷电特效
 
-No external image files required!
+无需任何外部图片文件！
 
-## 🔧 Development
+## 🔧 开发指南
 
-### Adding New Features
-The main game logic is in `src/scenes/MainScene.ts`. Key methods:
-- `preload()`: Load/generate assets
-- `create()`: Initialize game objects
-- `update()`: Game loop logic
+### 添加新功能
+主要游戏逻辑位于 `src/scenes/CoinChaserScene.ts`，关键方法：
+- `preload()`: 加载/生成资源
+- `create()`: 初始化游戏对象
+- `update()`: 游戏循环逻辑
 
-### Customization
-You can easily customize:
-- Player colors and designs in `createPixelAssets()`
-- Platform layouts in `createPlatforms()`
-- Enemy behavior in the `update()` loop
-- Physics parameters in `src/main.ts`
+### 自定义修改
+你可以轻松自定义：
+- `createPixelAssets()` 中的玩家颜色和设计
+- `createPlatforms()` 中的平台布局
+- `update()` 循环中的敌人行为
+- `src/main.ts` 中的物理参数
 
-## 📝 License
+## 📝 许可证
 
-This project is created for educational purposes.
+本项目仅供教育和学习目的。
 
-## 🎯 Future Ideas
+## 🎯 未来计划
 
-- [ ] Add sound effects and music
-- [ ] Implement power-ups (speed boost, invincibility, etc.)
-- [ ] Create multiple levels
-- [ ] Add boss battles
-- [ ] Implement local high score storage
-- [ ] Add more enemy types
-- [ ] Create level editor
+- [ ] 添加音效和背景音乐
+- [ ] 实现更多道具（加速、无敌等）
+- [ ] 创建多个关卡
+- [ ] 添加Boss战
+- [ ] 实现本地最高分存储
+- [ ] 添加更多敌人类型
+- [ ] 创建关卡编辑器
 
-## 🤝 Contributing
+## 🤝 参与贡献
 
-Feel free to fork this project and add your own features!
+欢迎 Fork 本项目并添加你自己的功能！
 
 ---
 
-**Enjoy the game! 🎮✨**
+**尽情享受游戏吧！🎮✨**
 
-Made with ❤️ using Phaser 3 and TypeScript
+使用 Phaser 3 和 TypeScript 用心制作 ❤️

@@ -1,6 +1,6 @@
 import './style.css';
 import Phaser from 'phaser';
-import MainScene from './scenes/MainScene';
+import CoinChaserScene from './scenes/CoinChaserScene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -15,7 +15,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false
     }
   },
-  scene: [MainScene],
+  scene: [CoinChaserScene],
   pixelArt: true, // 启用像素艺术模式，保持像素清晰
   scale: {
     mode: Phaser.Scale.FIT,
@@ -23,5 +23,5 @@ const config: Phaser.Types.Core.GameConfig = {
   }
 };
 
-const game = new Phaser.Game(config);
+new Phaser.Game(config);
 
