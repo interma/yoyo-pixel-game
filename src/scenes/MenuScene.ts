@@ -37,16 +37,15 @@ export default class MenuScene extends Phaser.Scene {
         scene: 'CoinChaserScene',
         color: 0xffd700,
         icon: '💰'
+      },
+      {
+        name: '古堡逃亡',
+        nameEn: 'Castle Escape',
+        description: '傍晚古堡中跳跃躲避深坑',
+        scene: 'ScrollRunnerScene',
+        color: 0xff6b35,
+        icon: '🏰'
       }
-      // 未来可以在这里添加更多游戏
-      // {
-      //   name: '太空射击',
-      //   nameEn: 'Space Shooter',
-      //   description: '经典太空射击游戏',
-      //   scene: 'SpaceShooterScene',
-      //   color: 0xff6b6b,
-      //   icon: '🚀'
-      // }
     ];
 
     const startY = 220;

@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { CHARACTERS } from '../characters';
 import type { CharacterConfig } from '../characters';
 import { createAllCharacterTextures } from '../characters';
+import { createEnemyTextures, createCoinTexture } from '../common/GameAssets';
+import { setupCheatListener, CHEAT_CODES } from '../common/CheatSystem';
 
 export default class CoinChaserScene extends Phaser.Scene {
   private player!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody;
@@ -24,7 +26,6 @@ export default class CoinChaserScene extends Phaser.Scene {
   private player2Coins: number = 0;
   private gameOver: boolean = false;
   private gameWon: boolean = false;
-  private cheatCodeInput: string = '';
   private isInvincible: boolean = false;
   private shieldGraphics: Phaser.GameObjects.Graphics[] = [];
   private lightningGraphics: Phaser.GameObjects.Graphics[] = [];
@@ -117,27 +118,11 @@ export default class CoinChaserScene extends Phaser.Scene {
       }
     });
 
-    // 监听秘籍输入
-    this.input.keyboard!.on('keydown', (event: KeyboardEvent) => {
-      // 只记录数字键
-      if (event.key >= '0' && event.key <= '9') {
-        this.cheatCodeInput += event.key;
-        // 只保留最后6位
-        if (this.cheatCodeInput.length > 6) {
-          this.cheatCodeInput = this.cheatCodeInput.slice(-6);
-        }
-        // 检查是否匹配秘籍
-        if (this.cheatCodeInput === '131119' && !this.gameWon) {
-          console.log('Cheat code activated!');
-          this.showVictory();
-          this.cheatCodeInput = ''; // 重置输入
-        }
-        // 无敌秘籍
-        if (this.cheatCodeInput === '131120' && !this.isInvincible) {
-          console.log('Invincibility activated!');
-          this.activateInvincibility();
-          this.cheatCodeInput = ''; // 重置输入
-        }
+    // 监听秘籍输入（使用通用模块）
+    setupCheatListener(this, (code) => {
+      if (code === CHEAT_CODES.INVINCIBILITY && !this.isInvincible) {
+        console.log('Invincibility Shield activated!');
+        this.activateInvincibility();
       }
     });
 
@@ -257,8 +242,8 @@ export default class CoinChaserScene extends Phaser.Scene {
         this.player.setVelocityY(-500);
       }
 
-      // 玩家1飞行（只有Sonic才能飞）
-      if (this.selectedCharacters[0] === 'sonic' && this.fKey.isDown) {
+      // 玩家1飞行（长按F键）
+      if (this.fKey.isDown) {
         this.player.setVelocityY(-300);
       }
     }
@@ -278,6 +263,11 @@ export default class CoinChaserScene extends Phaser.Scene {
       // 玩家2跳跃
       if (this.wasdKeys.up.isDown && this.player2.body.touching.down) {
         this.player2.setVelocityY(-500);
+      }
+
+      // 玩家2飞行（长按F键）
+      if (this.fKey.isDown) {
+        this.player2.setVelocityY(-300);
       }
     }
 
@@ -386,71 +376,9 @@ export default class CoinChaserScene extends Phaser.Scene {
     platformGraphics.generateTexture('platform', 64, 16);
     platformGraphics.destroy();
 
-    // 创建金币纹理
-    const coinGraphics = this.add.graphics();
-    coinGraphics.fillStyle(0xffff00, 1);
-    coinGraphics.fillCircle(8, 8, 8);
-    coinGraphics.fillStyle(0xffa500, 1);
-    coinGraphics.fillCircle(8, 8, 4);
-    coinGraphics.generateTexture('coin', 16, 16);
-    coinGraphics.destroy();
-
-    // 创建敌人纹理（蘑菇怪）
-    const enemyGraphics = this.add.graphics();
-    // 蘑菇帽
-    enemyGraphics.fillStyle(0xff0000, 1);
-    enemyGraphics.fillCircle(12, 8, 10);
-    enemyGraphics.fillStyle(0xffffff, 1);
-    enemyGraphics.fillCircle(8, 6, 3);
-    enemyGraphics.fillCircle(16, 6, 3);
-    // 蘑菇身体
-    enemyGraphics.fillStyle(0xffe4b5, 1);
-    enemyGraphics.fillRect(8, 12, 8, 8);
-    // 眼睛
-    enemyGraphics.fillStyle(0x000000, 1);
-    enemyGraphics.fillRect(9, 14, 2, 2);
-    enemyGraphics.fillRect(13, 14, 2, 2);
-    enemyGraphics.generateTexture('enemy', 24, 24);
-    enemyGraphics.destroy();
-
-    // 创建喷火敌人纹理（火龙/飞龙）
-    const fireEnemyGraphics = this.add.graphics();
-    // 龙头（橙红色）
-    fireEnemyGraphics.fillStyle(0xff4500, 1);
-    fireEnemyGraphics.fillEllipse(12, 10, 14, 12);
-    // 龙角
-    fireEnemyGraphics.fillStyle(0x8b0000, 1);
-    fireEnemyGraphics.fillTriangle(6, 8, 4, 4, 8, 6);
-    fireEnemyGraphics.fillTriangle(18, 8, 20, 4, 16, 6);
-    // 眼睛（黄色发光）
-    fireEnemyGraphics.fillStyle(0xffff00, 1);
-    fireEnemyGraphics.fillCircle(8, 9, 3);
-    fireEnemyGraphics.fillCircle(16, 9, 3);
-    fireEnemyGraphics.fillStyle(0xff0000, 1);
-    fireEnemyGraphics.fillCircle(8, 9, 1);
-    fireEnemyGraphics.fillCircle(16, 9, 1);
-    // 鼻孔（喷火口）
-    fireEnemyGraphics.fillStyle(0x000000, 1);
-    fireEnemyGraphics.fillCircle(9, 13, 2);
-    fireEnemyGraphics.fillCircle(15, 13, 2);
-    // 翅膀
-    fireEnemyGraphics.fillStyle(0xdc143c, 1);
-    fireEnemyGraphics.fillTriangle(2, 10, 0, 6, 4, 12);
-    fireEnemyGraphics.fillTriangle(22, 10, 24, 6, 20, 12);
-    fireEnemyGraphics.generateTexture('fireEnemy', 24, 20);
-    fireEnemyGraphics.destroy();
-
-    // 创建火球纹理
-    const fireballGraphics = this.add.graphics();
-    // 火球核心
-    fireballGraphics.fillStyle(0xffff00, 1);
-    fireballGraphics.fillCircle(6, 6, 4);
-    fireballGraphics.fillStyle(0xff4500, 1);
-    fireballGraphics.fillCircle(6, 6, 5);
-    fireballGraphics.fillStyle(0xff0000, 1);
-    fireballGraphics.fillCircle(6, 6, 3);
-    fireballGraphics.generateTexture('fireball', 12, 12);
-    fireballGraphics.destroy();
+    // 使用通用模块创建敌人和金币纹理
+    createCoinTexture(this);
+    createEnemyTextures(this);
 
     // 创建地面纹理（索尼克棋盘格风格）
     const groundGraphics = this.add.graphics();
@@ -1071,8 +999,8 @@ export default class CoinChaserScene extends Phaser.Scene {
       repeat: 10
     });
 
-    // 10秒后移除无敌状态
-    this.time.delayedCall(10000, () => {
+    // 15秒后移除无敌状态
+    this.time.delayedCall(15000, () => {
       this.isInvincible = false;
       
       // 清理所有光盾
@@ -1229,7 +1157,6 @@ export default class CoinChaserScene extends Phaser.Scene {
       this.player1Coins = 0;
       this.player2Coins = 0;
       this.isInvincible = false;
-      this.cheatCodeInput = '';
       this.movingPlatformData = [];
       this.shieldGraphics = [];
       this.lightningGraphics = [];
@@ -1331,7 +1258,6 @@ export default class CoinChaserScene extends Phaser.Scene {
         this.player1Coins = 0;
         this.player2Coins = 0;
         this.isInvincible = false;
-        this.cheatCodeInput = '';
         this.movingPlatformData = [];
         this.shieldGraphics = [];
         this.lightningGraphics = [];
@@ -1521,8 +1447,8 @@ export default class CoinChaserScene extends Phaser.Scene {
 
     // 创建选择卡片
     const options = [
-      { count: 1, label: '单人游戏', icon: '👤', y: 260 },
-      { count: 2, label: '双人游戏', icon: '👥', y: 400 }
+      { count: 1, label: '单人', icon: '👤', y: 260 },
+      { count: 2, label: '双人', icon: '👥', y: 400 }
     ];
 
     options.forEach(option => {
