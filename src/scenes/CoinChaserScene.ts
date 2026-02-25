@@ -1,12 +1,13 @@
 import Phaser from 'phaser';
+import { CHARACTERS } from '../characters';
+import type { CharacterConfig } from '../characters';
+import { createAllCharacterTextures } from '../characters';
 
 export default class CoinChaserScene extends Phaser.Scene {
   private player!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody;
   private player2!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody;
-  private player3!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasdKeys!: any;
-  private numpadKeys!: any;
   private fKey!: Phaser.Input.Keyboard.Key;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private movingPlatforms!: Phaser.Physics.Arcade.Group;
@@ -21,7 +22,6 @@ export default class CoinChaserScene extends Phaser.Scene {
   private lives: number = 3;
   private player1Coins: number = 0;
   private player2Coins: number = 0;
-  private player3Coins: number = 0;
   private gameOver: boolean = false;
   private gameWon: boolean = false;
   private cheatCodeInput: string = '';
@@ -29,6 +29,13 @@ export default class CoinChaserScene extends Phaser.Scene {
   private shieldGraphics: Phaser.GameObjects.Graphics[] = [];
   private lightningGraphics: Phaser.GameObjects.Graphics[] = [];
   private lightningTimers: Phaser.Time.TimerEvent[] = [];
+  
+  // 角色选择相关
+  private isInSelectionMode: boolean = true;
+  private playerCount: number = 2;
+  private selectedCharacters: string[] = [];
+  private selectionUI: Phaser.GameObjects.Container[] = [];
+  private characterOptions: CharacterConfig[] = CHARACTERS;
 
   constructor() {
     super({ key: 'CoinChaserScene' });
@@ -37,6 +44,8 @@ export default class CoinChaserScene extends Phaser.Scene {
   preload() {
     // 由于我们没有外部图片资源，使用代码生成像素风格的图形
     this.createPixelAssets();
+    // 创建所有角色纹理
+    createAllCharacterTextures(this);
   }
 
   create() {
@@ -46,17 +55,16 @@ export default class CoinChaserScene extends Phaser.Scene {
     // 扩大世界边界，允许更高的跳跃空间
     this.physics.world.setBounds(0, 0, 800, 1200);
 
+    // 显示标题画面
+    this.showTitleScreen();
+  }
+
+  private startGame() {
     // 创建平台
     this.createPlatforms();
 
-    // 创建玩家
-    this.createPlayer();
-
-    // 创建玩家2
-    this.createPlayer2();
-
-    // 创建玩家3（樱桃小丸子）
-    this.createPlayer3();
+    // 根据选择创建玩家
+    this.createSelectedPlayers();
 
     // 创建金币
     this.createCoins();
@@ -81,43 +89,36 @@ export default class CoinChaserScene extends Phaser.Scene {
       right: Phaser.Input.Keyboard.KeyCodes.D
     });
 
-    // 创建小键盘控制器（4568）
-    this.numpadKeys = this.input.keyboard!.addKeys({
-      left: Phaser.Input.Keyboard.KeyCodes.NUMPAD_FOUR,
-      down: Phaser.Input.Keyboard.KeyCodes.NUMPAD_FIVE,
-      right: Phaser.Input.Keyboard.KeyCodes.NUMPAD_SIX,
-      up: Phaser.Input.Keyboard.KeyCodes.NUMPAD_EIGHT
-    });
-
     // 创建F键用于飞行
     this.fKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F);
 
     // 创建UI
     this.createUI();
 
+    // 设置键盘事件
+    this.setupKeyboardEvents();
+
+    // 标记游戏已开始
+    this.isInSelectionMode = false;
+  }
+
+  private setupKeyboardEvents() {
     // 添加跳跃音效替代（视觉反馈）
     this.input.keyboard!.on('keydown-SPACE', () => {
-      if (this.player.body.touching.down && !this.gameOver) {
+      if (this.player && this.player.body.touching.down && !this.gameOver) {
         this.player.setVelocityY(-500);
       }
     });
 
     // 玩家2跳跃（Shift键）
     this.input.keyboard!.on('keydown-SHIFT', () => {
-      if (this.player2.body.touching.down && !this.gameOver) {
+      if (this.player2 && this.player2.body.touching.down && !this.gameOver) {
         this.player2.setVelocityY(-500);
       }
     });
 
-    // 监听秘籍输入和玩家3跳跃
+    // 监听秘籍输入
     this.input.keyboard!.on('keydown', (event: KeyboardEvent) => {
-      // 玩家3跳跃（小键盘0或+）
-      if ((event.key === '0' && event.location === 3) || event.code === 'NumpadAdd') {
-        if (this.player3.body.touching.down && !this.gameOver) {
-          this.player3.setVelocityY(-500);
-        }
-      }
-      
       // 只记录数字键
       if (event.key >= '0' && event.key <= '9') {
         this.cheatCodeInput += event.key;
@@ -139,24 +140,40 @@ export default class CoinChaserScene extends Phaser.Scene {
         }
       }
     });
+
+    // ESC键返回菜单
+    this.input.keyboard!.on('keydown-ESC', () => {
+      this.cameras.main.fadeOut(300, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start('MenuScene');
+      });
+    });
   }
 
   update() {
+    // 选择模式下不执行游戏逻辑
+    if (this.isInSelectionMode) {
+      return;
+    }
+
     if (this.gameOver || this.gameWon) {
       return;
     }
 
     // 更新光盾位置
     if (this.isInvincible && this.shieldGraphics.length > 0) {
-      const players = [this.player, this.player2, this.player3];
+      const activePlayers: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody[] = [];
+      if (this.player) activePlayers.push(this.player);
+      if (this.player2) activePlayers.push(this.player2);
+      
       this.shieldGraphics.forEach((shield, index) => {
-        if (shield && players[index]) {
-          shield.setPosition(players[index].x, players[index].y);
+        if (shield && activePlayers[index]) {
+          shield.setPosition(activePlayers[index].x, activePlayers[index].y);
         }
       });
       this.lightningGraphics.forEach((lightning, index) => {
-        if (lightning && players[index]) {
-          lightning.setPosition(players[index].x, players[index].y);
+        if (lightning && activePlayers[index]) {
+          lightning.setPosition(activePlayers[index].x, activePlayers[index].y);
         }
       });
     }
@@ -189,30 +206,25 @@ export default class CoinChaserScene extends Phaser.Scene {
         const platformRight = platform.x + platform.displayWidth / 2;
         
         // 移动玩家1
-        const p1Body = this.player.body as Phaser.Physics.Arcade.Body;
-        if (p1Body.touching.down && 
-            this.player.y <= platformTop + 5 && 
-            this.player.x >= platformLeft - 10 && 
-            this.player.x <= platformRight + 10) {
-          this.player.x += deltaX;
+        if (this.player) {
+          const p1Body = this.player.body as Phaser.Physics.Arcade.Body;
+          if (p1Body.touching.down && 
+              this.player.y <= platformTop + 5 && 
+              this.player.x >= platformLeft - 10 && 
+              this.player.x <= platformRight + 10) {
+            this.player.x += deltaX;
+          }
         }
         
         // 移动玩家2
-        const p2Body = this.player2.body as Phaser.Physics.Arcade.Body;
-        if (p2Body.touching.down && 
-            this.player2.y <= platformTop + 5 && 
-            this.player2.x >= platformLeft - 10 && 
-            this.player2.x <= platformRight + 10) {
-          this.player2.x += deltaX;
-        }
-        
-        // 移动玩家3
-        const p3Body = this.player3.body as Phaser.Physics.Arcade.Body;
-        if (p3Body.touching.down && 
-            this.player3.y <= platformTop + 5 && 
-            this.player3.x >= platformLeft - 10 && 
-            this.player3.x <= platformRight + 10) {
-          this.player3.x += deltaX;
+        if (this.player2) {
+          const p2Body = this.player2.body as Phaser.Physics.Arcade.Body;
+          if (p2Body.touching.down && 
+              this.player2.y <= platformTop + 5 && 
+              this.player2.x >= platformLeft - 10 && 
+              this.player2.x <= platformRight + 10) {
+            this.player2.x += deltaX;
+          }
         }
         
         // 移动金币
@@ -229,56 +241,44 @@ export default class CoinChaserScene extends Phaser.Scene {
     });
 
     // 玩家1移动（方向键）
-    if (this.cursors.left.isDown) {
-      this.player.setVelocityX(-200);
-      this.player.flipX = true;
-    } else if (this.cursors.right.isDown) {
-      this.player.setVelocityX(200);
-      this.player.flipX = false;
-    } else {
-      this.player.setVelocityX(0);
-    }
+    if (this.player) {
+      if (this.cursors.left.isDown) {
+        this.player.setVelocityX(-200);
+        this.player.flipX = true;
+      } else if (this.cursors.right.isDown) {
+        this.player.setVelocityX(200);
+        this.player.flipX = false;
+      } else {
+        this.player.setVelocityX(0);
+      }
 
-    // 玩家1跳跃
-    if (this.cursors.up.isDown && this.player.body.touching.down) {
-      this.player.setVelocityY(-500);
-    }
+      // 玩家1跳跃
+      if (this.cursors.up.isDown && this.player.body.touching.down) {
+        this.player.setVelocityY(-500);
+      }
 
-    // 玩家1飞行（长按F键）
-    if (this.fKey.isDown) {
-      this.player.setVelocityY(-300);
+      // 玩家1飞行（只有Sonic才能飞）
+      if (this.selectedCharacters[0] === 'sonic' && this.fKey.isDown) {
+        this.player.setVelocityY(-300);
+      }
     }
 
     // 玩家2移动（WASD）
-    if (this.wasdKeys.left.isDown) {
-      this.player2.setVelocityX(-200);
-      this.player2.flipX = true;
-    } else if (this.wasdKeys.right.isDown) {
-      this.player2.setVelocityX(200);
-      this.player2.flipX = false;
-    } else {
-      this.player2.setVelocityX(0);
-    }
+    if (this.player2) {
+      if (this.wasdKeys.left.isDown) {
+        this.player2.setVelocityX(-200);
+        this.player2.flipX = true;
+      } else if (this.wasdKeys.right.isDown) {
+        this.player2.setVelocityX(200);
+        this.player2.flipX = false;
+      } else {
+        this.player2.setVelocityX(0);
+      }
 
-    // 玩家2跳跃
-    if (this.wasdKeys.up.isDown && this.player2.body.touching.down) {
-      this.player2.setVelocityY(-500);
-    }
-
-    // 玩家3移动（小键盘）
-    if (this.numpadKeys.left.isDown) {
-      this.player3.setVelocityX(-200);
-      this.player3.flipX = true;
-    } else if (this.numpadKeys.right.isDown) {
-      this.player3.setVelocityX(200);
-      this.player3.flipX = false;
-    } else {
-      this.player3.setVelocityX(0);
-    }
-
-    // 玩家3跳跃
-    if (this.numpadKeys.up.isDown && this.player3.body.touching.down) {
-      this.player3.setVelocityY(-500);
+      // 玩家2跳跃
+      if (this.wasdKeys.up.isDown && this.player2.body.touching.down) {
+        this.player2.setVelocityY(-500);
+      }
     }
 
     // 敌人移动
@@ -320,176 +320,51 @@ export default class CoinChaserScene extends Phaser.Scene {
     });
 
     // 检查玩家是否掉出屏幕（扩大到世界底部）
-    if (this.player.y > 1200 || this.player2.y > 1200 || this.player3.y > 1200) {
+    if (this.player && this.player.y > 1200) {
+      this.loseLife();
+    } else if (this.player2 && this.player2.y > 1200) {
       this.loseLife();
     }
 
-    // 相机跟随三个玩家的中心点
-    const centerX = (this.player.x + this.player2.x + this.player3.x) / 3;
-    const centerY = (this.player.y + this.player2.y + this.player3.y) / 3;
-    this.cameras.main.scrollX = Phaser.Math.Linear(
-      this.cameras.main.scrollX,
-      centerX - 400,
-      0.05
-    );
-    
-    // 垂直方向只在玩家向上移动时才跟随，让玩家保持在屏幕下方
-    const targetScrollY = Math.max(0, centerY - 450);
-    this.cameras.main.scrollY = Phaser.Math.Linear(
-      this.cameras.main.scrollY,
-      targetScrollY,
-      0.05
-    );
+    // 相机跟随玩家
+    let centerX = 0;
+    let centerY = 0;
+    let playerCountForCamera = 0;
+
+    if (this.player) {
+      centerX += this.player.x;
+      centerY += this.player.y;
+      playerCountForCamera++;
+    }
+
+    if (this.player2) {
+      centerX += this.player2.x;
+      centerY += this.player2.y;
+      playerCountForCamera++;
+    }
+
+    if (playerCountForCamera > 0) {
+      centerX /= playerCountForCamera;
+      centerY /= playerCountForCamera;
+      
+      this.cameras.main.scrollX = Phaser.Math.Linear(
+        this.cameras.main.scrollX,
+        centerX - 400,
+        0.05
+      );
+      
+      // 垂直方向只在玩家向上移动时才跟随，让玩家保持在屏幕下方
+      const targetScrollY = Math.max(0, centerY - 450);
+      this.cameras.main.scrollY = Phaser.Math.Linear(
+        this.cameras.main.scrollY,
+        targetScrollY,
+        0.05
+      );
+    }
   }
 
   private createPixelAssets() {
-    // 创建玩家纹理（索尼克风格 - 20x20像素）
-    const playerGraphics = this.add.graphics();
-    
-    // 蓝色身体（圆形）
-    playerGraphics.fillStyle(0x0080ff, 1);
-    playerGraphics.fillCircle(10, 10, 7);
-    
-    // 刺猬的尖刺（背后的3个尖刺）
-    playerGraphics.fillStyle(0x0060dd, 1);
-    playerGraphics.fillTriangle(14, 8, 18, 6, 16, 10);
-    playerGraphics.fillTriangle(14, 10, 18, 12, 16, 10);
-    playerGraphics.fillTriangle(13, 12, 16, 15, 14, 12);
-    
-    // 肚子（浅色）
-    playerGraphics.fillStyle(0xffe4b5, 1);
-    playerGraphics.fillCircle(9, 11, 4);
-    
-    // 大眼睛（白色底）
-    playerGraphics.fillStyle(0xffffff, 1);
-    playerGraphics.fillEllipse(7, 8, 5, 4);
-    playerGraphics.fillEllipse(11, 8, 5, 4);
-    
-    // 眼珠（黑色）
-    playerGraphics.fillStyle(0x000000, 1);
-    playerGraphics.fillCircle(7, 8, 2);
-    playerGraphics.fillCircle(11, 8, 2);
-    
-    // 眼睛高光
-    playerGraphics.fillStyle(0xffffff, 1);
-    playerGraphics.fillCircle(7.5, 7.5, 1);
-    playerGraphics.fillCircle(11.5, 7.5, 1);
-    
-    // 红色鞋子
-    playerGraphics.fillStyle(0xff0000, 1);
-    playerGraphics.fillEllipse(6, 16, 3, 2);
-    playerGraphics.fillEllipse(12, 16, 3, 2);
-    
-    // 鞋子白色装饰
-    playerGraphics.fillStyle(0xffffff, 1);
-    playerGraphics.fillRect(5, 15, 3, 1);
-    playerGraphics.fillRect(11, 15, 3, 1);
-    
-    playerGraphics.generateTexture('player', 20, 20);
-    playerGraphics.destroy();
-
-    // 创建玩家2纹理（Shadow风格 - 20x20像素）
-    const player2Graphics = this.add.graphics();
-    
-    // 黑色身体（圆形）
-    player2Graphics.fillStyle(0x1a1a1a, 1);
-    player2Graphics.fillCircle(10, 10, 7);
-    
-    // 刺猬的尖刺（红色条纹）
-    player2Graphics.fillStyle(0xff0000, 1);
-    player2Graphics.fillTriangle(14, 8, 18, 6, 16, 10);
-    player2Graphics.fillTriangle(14, 10, 18, 12, 16, 10);
-    player2Graphics.fillTriangle(13, 12, 16, 15, 14, 12);
-    
-    // 胸部（白色/灰色）
-    player2Graphics.fillStyle(0xd0d0d0, 1);
-    player2Graphics.fillCircle(9, 11, 4);
-    
-    // 红色条纹（手臂）
-    player2Graphics.fillStyle(0xff0000, 1);
-    player2Graphics.fillRect(4, 10, 2, 4);
-    player2Graphics.fillRect(14, 10, 2, 4);
-    
-    // 大眼睛（红色）
-    player2Graphics.fillStyle(0xffffff, 1);
-    player2Graphics.fillEllipse(7, 8, 5, 4);
-    player2Graphics.fillEllipse(11, 8, 5, 4);
-    
-    // 眼珠（红色）
-    player2Graphics.fillStyle(0xff0000, 1);
-    player2Graphics.fillCircle(7, 8, 2);
-    player2Graphics.fillCircle(11, 8, 2);
-    
-    // 眼睛高光
-    player2Graphics.fillStyle(0xffffff, 1);
-    player2Graphics.fillCircle(7.5, 7.5, 1);
-    player2Graphics.fillCircle(11.5, 7.5, 1);
-    
-    // 黑红色鞋子
-    player2Graphics.fillStyle(0x1a1a1a, 1);
-    player2Graphics.fillEllipse(6, 16, 3, 2);
-    player2Graphics.fillEllipse(12, 16, 3, 2);
-    
-    // 鞋子红色装饰
-    player2Graphics.fillStyle(0xff0000, 1);
-    player2Graphics.fillRect(5, 15, 3, 1);
-    player2Graphics.fillRect(11, 15, 3, 1);
-    
-    player2Graphics.generateTexture('player2', 20, 20);
-    player2Graphics.destroy();
-
-    // 创建玩家3纹理（艾米·罗斯风格 - 20x20像素）
-    const player3Graphics = this.add.graphics();
-    
-    // 粉红色身体（圆形）
-    player3Graphics.fillStyle(0xff69b4, 1);
-    player3Graphics.fillCircle(10, 10, 7);
-    
-    // 刺猬的尖刺（粉红色，背后的3个尖刺）
-    player3Graphics.fillStyle(0xff1493, 1);
-    player3Graphics.fillTriangle(14, 8, 18, 6, 16, 10);
-    player3Graphics.fillTriangle(14, 10, 18, 12, 16, 10);
-    player3Graphics.fillTriangle(13, 12, 16, 15, 14, 12);
-    
-    // 额前刺猬毛（特色）
-    player3Graphics.fillStyle(0xff1493, 1);
-    player3Graphics.fillTriangle(6, 4, 4, 2, 7, 5);
-    
-    // 肚子（浅粉色）
-    player3Graphics.fillStyle(0xffb6c1, 1);
-    player3Graphics.fillCircle(9, 11, 4);
-    
-    // 大眼睛（白色底）
-    player3Graphics.fillStyle(0xffffff, 1);
-    player3Graphics.fillEllipse(7, 8, 5, 4);
-    player3Graphics.fillEllipse(11, 8, 5, 4);
-    
-    // 眼珠（绿色）
-    player3Graphics.fillStyle(0x00ff00, 1);
-    player3Graphics.fillCircle(7, 8, 2);
-    player3Graphics.fillCircle(11, 8, 2);
-    
-    // 眼睛高光
-    player3Graphics.fillStyle(0xffffff, 1);
-    player3Graphics.fillCircle(7.5, 7.5, 1);
-    player3Graphics.fillCircle(11.5, 7.5, 1);
-    
-    // 红色连衣裙（上半部分）
-    player3Graphics.fillStyle(0xff0000, 1);
-    player3Graphics.fillRect(6, 14, 8, 2);
-    
-    // 红白色靴子
-    player3Graphics.fillStyle(0xff0000, 1);
-    player3Graphics.fillEllipse(6, 16, 3, 2);
-    player3Graphics.fillEllipse(12, 16, 3, 2);
-    
-    // 靴子白色装饰
-    player3Graphics.fillStyle(0xffffff, 1);
-    player3Graphics.fillRect(5, 15, 3, 1);
-    player3Graphics.fillRect(11, 15, 3, 1);
-    
-    player3Graphics.generateTexture('player3', 20, 20);
-    player3Graphics.destroy();
+    // 角色纹理已由 createAllCharacterTextures 创建
 
     // 创建平台纹理（索尼克风格 - 棕色平台）
     const platformGraphics = this.add.graphics();
@@ -760,33 +635,6 @@ export default class CoinChaserScene extends Phaser.Scene {
     this.platforms.create(650, -140, 'platform');
   }
 
-  private createPlayer() {
-    this.player = this.physics.add.sprite(100, 500, 'player');
-    this.player.setBounce(0.1);
-    this.player.setCollideWorldBounds(true);
-    this.player.setScale(2); // 放大玩家
-
-    // 设置相机边界
-    this.cameras.main.setBounds(0, 0, 800, 1200);
-    
-    // 设置相机初始位置，让地面显示在屏幕底部
-    this.cameras.main.scrollY = 0;
-  }
-
-  private createPlayer2() {
-    this.player2 = this.physics.add.sprite(150, 500, 'player2');
-    this.player2.setBounce(0.1);
-    this.player2.setCollideWorldBounds(true);
-    this.player2.setScale(2); // 放大玩家
-  }
-
-  private createPlayer3() {
-    this.player3 = this.physics.add.sprite(200, 500, 'player3');
-    this.player3.setBounce(0.1);
-    this.player3.setCollideWorldBounds(true);
-    this.player3.setScale(2); // 放大玩家
-  }
-
   private createCoins() {
     this.coins = this.physics.add.group();
 
@@ -864,14 +712,15 @@ export default class CoinChaserScene extends Phaser.Scene {
 
   private setupCollisions() {
     // 玩家与平台碰撞
-    this.physics.add.collider(this.player, this.platforms);
-    this.physics.add.collider(this.player2, this.platforms);
-    this.physics.add.collider(this.player3, this.platforms);
-
-    // 玩家与移动平台碰撞
-    this.physics.add.collider(this.player, this.movingPlatforms);
-    this.physics.add.collider(this.player2, this.movingPlatforms);
-    this.physics.add.collider(this.player3, this.movingPlatforms);
+    if (this.player) {
+      this.physics.add.collider(this.player, this.platforms);
+      this.physics.add.collider(this.player, this.movingPlatforms);
+    }
+    
+    if (this.player2) {
+      this.physics.add.collider(this.player2, this.platforms);
+      this.physics.add.collider(this.player2, this.movingPlatforms);
+    }
 
     // 金币与平台碰撞
     this.physics.add.collider(this.coins, this.platforms);
@@ -892,112 +741,80 @@ export default class CoinChaserScene extends Phaser.Scene {
     });
 
     // 玩家1与火球碰撞
-    this.physics.add.overlap(
-      this.player,
-      this.fireballs,
-      this.hitByFireball as any,
-      undefined,
-      this
-    );
+    if (this.player) {
+      this.physics.add.overlap(
+        this.player,
+        this.fireballs,
+        this.hitByFireball as any,
+        undefined,
+        this
+      );
+
+      // 玩家1与喷火敌人碰撞
+      this.physics.add.overlap(
+        this.player,
+        this.fireEnemies,
+        this.hitFireEnemy as any,
+        undefined,
+        this
+      );
+
+      // 玩家1收集金币
+      this.physics.add.overlap(
+        this.player,
+        this.coins,
+        this.collectCoinPlayer1 as any,
+        undefined,
+        this
+      );
+
+      // 玩家1与敌人碰撞
+      this.physics.add.collider(
+        this.player,
+        this.enemies,
+        this.hitEnemy as any,
+        undefined,
+        this
+      );
+    }
 
     // 玩家2与火球碰撞
-    this.physics.add.overlap(
-      this.player2,
-      this.fireballs,
-      this.hitByFireball as any,
-      undefined,
-      this
-    );
+    if (this.player2) {
+      this.physics.add.overlap(
+        this.player2,
+        this.fireballs,
+        this.hitByFireball as any,
+        undefined,
+        this
+      );
 
-    // 玩家3与火球碰撞
-    this.physics.add.overlap(
-      this.player3,
-      this.fireballs,
-      this.hitByFireball as any,
-      undefined,
-      this
-    );
+      // 玩家2与喷火敌人碰撞
+      this.physics.add.overlap(
+        this.player2,
+        this.fireEnemies,
+        this.hitFireEnemy as any,
+        undefined,
+        this
+      );
 
-    // 玩家1与喷火敌人碰撞
-    this.physics.add.overlap(
-      this.player,
-      this.fireEnemies,
-      this.hitFireEnemy as any,
-      undefined,
-      this
-    );
+      // 玩家2收集金币
+      this.physics.add.overlap(
+        this.player2,
+        this.coins,
+        this.collectCoinPlayer2 as any,
+        undefined,
+        this
+      );
 
-    // 玩家2与喷火敌人碰撞
-    this.physics.add.overlap(
-      this.player2,
-      this.fireEnemies,
-      this.hitFireEnemy as any,
-      undefined,
-      this
-    );
-
-    // 玩家3与喷火敌人碰撞
-    this.physics.add.overlap(
-      this.player3,
-      this.fireEnemies,
-      this.hitFireEnemy as any,
-      undefined,
-      this
-    );
-
-    // 玩家1收集金币
-    this.physics.add.overlap(
-      this.player,
-      this.coins,
-      this.collectCoinPlayer1 as any,
-      undefined,
-      this
-    );
-
-    // 玩家2收集金币
-    this.physics.add.overlap(
-      this.player2,
-      this.coins,
-      this.collectCoinPlayer2 as any,
-      undefined,
-      this
-    );
-
-    // 玩家3收集金币
-    this.physics.add.overlap(
-      this.player3,
-      this.coins,
-      this.collectCoinPlayer3 as any,
-      undefined,
-      this
-    );
-
-    // 玩家1与敌人碰撞
-    this.physics.add.collider(
-      this.player,
-      this.enemies,
-      this.hitEnemy as any,
-      undefined,
-      this
-    );
-
-    // 玩家2与敌人碰撞
-    this.physics.add.collider(
-      this.player2,
-      this.enemies,
-      this.hitEnemy as any,
-      undefined,
-      this
-    );
-
-    // 玩家3与敌人碰撞
-    this.physics.add.collider(
-      this.player3,
-      this.enemies,
-      this.hitEnemy as any,
-      undefined,
-      this
-    );
+      // 玩家2与敌人碰撞
+      this.physics.add.collider(
+        this.player2,
+        this.enemies,
+        this.hitEnemy as any,
+        undefined,
+        this
+      );
+    }
   }
 
   private createUI() {
@@ -1008,7 +825,7 @@ export default class CoinChaserScene extends Phaser.Scene {
       fontFamily: 'Arial',
       stroke: '#000000',
       strokeThickness: 4
-    });
+    }).setScrollFactor(0).setDepth(100);
 
     // 生命值文字
     this.livesText = this.add.text(16, 50, 'Lives: ❤️❤️❤️', {
@@ -1017,16 +834,55 @@ export default class CoinChaserScene extends Phaser.Scene {
       fontFamily: 'Arial',
       stroke: '#000000',
       strokeThickness: 4
-    });
+    }).setScrollFactor(0).setDepth(100);
 
-    // 提示文字
-    this.add.text(400, 16, 'P1: Arrows/Space | P2: WASD/Shift | P3: Numpad 4568', {
+    // 提示文字 - 根据实际玩家数量显示
+    let controlsText = '';
+    const char1 = this.characterOptions.find(c => c.id === this.selectedCharacters[0]);
+    const char2 = this.playerCount === 2 ? this.characterOptions.find(c => c.id === this.selectedCharacters[1]) : null;
+    
+    if (this.playerCount === 1) {
+      controlsText = `${char1?.name}: 方向键移动/跳跃`;
+      if (this.selectedCharacters[0] === 'sonic') {
+        controlsText += ' | F键飞行';
+      }
+    } else {
+      controlsText = `P1(${char1?.name}): 方向键 | P2(${char2?.name}): WASD`;
+    }
+
+    this.add.text(400, 16, controlsText, {
       fontSize: '16px',
       color: '#ffffff',
       fontFamily: 'Arial',
       stroke: '#000000',
       strokeThickness: 3
-    }).setOrigin(0.5, 0);
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(100);
+
+    // 返回菜单按钮
+    const backButton = this.add.text(780, 16, '⬅ 菜单', {
+      fontSize: '20px',
+      color: '#ffffff',
+      fontFamily: 'Arial',
+      backgroundColor: '#ff6b6b',
+      padding: { x: 12, y: 6 }
+    }).setOrigin(1, 0).setScrollFactor(0).setDepth(100).setInteractive();
+
+    backButton.on('pointerover', () => {
+      backButton.setStyle({ backgroundColor: '#ff5252' });
+      this.game.canvas.style.cursor = 'pointer';
+    });
+
+    backButton.on('pointerout', () => {
+      backButton.setStyle({ backgroundColor: '#ff6b6b' });
+      this.game.canvas.style.cursor = 'default';
+    });
+
+    backButton.on('pointerdown', () => {
+      this.cameras.main.fadeOut(300, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start('MenuScene');
+      });
+    });
   }
 
   private collectCoinPlayer1(
@@ -1059,34 +915,33 @@ export default class CoinChaserScene extends Phaser.Scene {
     }
   }
 
-  private collectCoinPlayer3(
-    _player: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody,
-    coin: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody
-  ) {
-    coin.disableBody(true, true);
-    this.player3Coins++;
-    this.score += 10;
-    this.scoreText.setText('Score: ' + this.score);
-
-    // 检查是否所有金币都收集完了
-    if (this.coins.countActive(true) === 0) {
-      this.showVictory();
-    }
-  }
-
   private activateInvincibility() {
     this.isInvincible = true;
 
-    // 为三个玩家创建光盾
-    const players = [this.player, this.player2, this.player3];
-    const shieldColors = [0x0080ff, 0xff0000, 0xff00ff]; // 蓝色、红色、粉色
-    const lightningColors = [0x0080ff, 0xff0000, 0xff00ff]; // 蓝色、红色、粉色
+    // 为存在的玩家创建光盾
+    const players: Array<{player: any, color: number}> = [];
     
-    players.forEach((player, index) => {
+    if (this.player) {
+      const charData = this.characterOptions.find(c => c.id === this.selectedCharacters[0])!;
+      players.push({ 
+        player: this.player, 
+        color: parseInt(charData.color.replace('#', '0x'))
+      });
+    }
+    
+    if (this.player2) {
+      const charData = this.characterOptions.find(c => c.id === this.selectedCharacters[1])!;
+      players.push({ 
+        player: this.player2, 
+        color: parseInt(charData.color.replace('#', '0x'))
+      });
+    }
+    
+    players.forEach(({player, color}) => {
       // 创建光盾效果
       const shield = this.add.graphics();
-      shield.lineStyle(4, shieldColors[index], 0.6);
-      shield.fillStyle(shieldColors[index], 0.15);
+      shield.lineStyle(4, color, 0.6);
+      shield.fillStyle(color, 0.15);
       
       // 绘制六边形光盾
       const radius = 35;
@@ -1162,7 +1017,7 @@ export default class CoinChaserScene extends Phaser.Scene {
           }
           
           // 先绘制角色颜色外层（较宽）
-          lightning.lineStyle(5, lightningColors[index], 0.8);
+          lightning.lineStyle(5, color, 0.8);
           lightning.beginPath();
           lightning.moveTo(points[0].x, points[0].y);
           for (let k = 1; k < points.length; k++) {
@@ -1294,35 +1149,56 @@ export default class CoinChaserScene extends Phaser.Scene {
       strokeThickness: 4
     }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
-    // 创建排行榜
-    const rankings = [
-      { name: 'Sonic', coins: this.player1Coins, color: '#0080ff' },
-      { name: 'Shadow', coins: this.player2Coins, color: '#ff0000' },
-      { name: 'Amy', coins: this.player3Coins, color: '#ff00ff' }
-    ].sort((a, b) => b.coins - a.coins);
+    // 创建排行榜 - 只显示实际参与的玩家
+    const rankings: Array<{ name: string; coins: number; color: string; }> = [];
+    
+    this.selectedCharacters.forEach((charId, index) => {
+      const charData = this.characterOptions.find(c => c.id === charId);
+      if (charData) {
+        rankings.push({
+          name: charData.name,
+          coins: index === 0 ? this.player1Coins : this.player2Coins,
+          color: charData.color
+        });
+      }
+    });
+    
+    rankings.sort((a, b) => b.coins - a.coins);
 
-    // 显示排行榜标题
-    this.add.text(400, 340, 'Coin Rankings:', {
-      fontSize: '28px',
-      color: '#ffff00',
-      fontFamily: 'Arial',
-      stroke: '#000000',
-      strokeThickness: 3
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
-
-    // 显示排行
-    const medals = ['🥇', '🥈', '🥉'];
-    rankings.forEach((rank, index) => {
-      const yPos = 385 + index * 35;
-      const medal = medals[index] || '';
-      this.add.text(400, yPos, `${medal} ${rank.name}: ${rank.coins} coins`, {
-        fontSize: '24px',
-        color: rank.color,
+    // 只在双人游戏时显示排行榜
+    if (this.playerCount === 2) {
+      // 显示排行榜标题
+      this.add.text(400, 340, 'Coin Rankings:', {
+        fontSize: '28px',
+        color: '#ffff00',
         fontFamily: 'Arial',
         stroke: '#000000',
         strokeThickness: 3
       }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
-    });
+
+      // 显示排行
+      const medals = ['🥇', '🥈'];
+      rankings.forEach((rank, index) => {
+        const yPos = 385 + index * 35;
+        const medal = medals[index] || '';
+        this.add.text(400, yPos, `${medal} ${rank.name}: ${rank.coins} coins`, {
+          fontSize: '24px',
+          color: rank.color,
+          fontFamily: 'Arial',
+          stroke: '#000000',
+          strokeThickness: 3
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+      });
+    } else {
+      // 单人游戏只显示金币数
+      this.add.text(400, 360, `${rankings[0].name}收集了 ${rankings[0].coins} 个金币！`, {
+        fontSize: '28px',
+        color: rankings[0].color,
+        fontFamily: 'Arial',
+        stroke: '#000000',
+        strokeThickness: 3
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
+    }
 
     // 重启提示
     const restartText = this.add.text(400, 510, 'Press R to Play Again', {
@@ -1352,13 +1228,15 @@ export default class CoinChaserScene extends Phaser.Scene {
       this.gameWon = false;
       this.player1Coins = 0;
       this.player2Coins = 0;
-      this.player3Coins = 0;
       this.isInvincible = false;
       this.cheatCodeInput = '';
       this.movingPlatformData = [];
       this.shieldGraphics = [];
       this.lightningGraphics = [];
       this.lightningTimers = [];
+      this.isInSelectionMode = true;
+      this.selectedCharacters = [];
+      this.selectionUI = [];
       
       // 然后重启场景
       this.scene.restart();
@@ -1403,7 +1281,9 @@ export default class CoinChaserScene extends Phaser.Scene {
 
     if (this.lives <= 0) {
       this.physics.pause();
-      this.player.setTint(0xff0000);
+      if (this.player) {
+        this.player.setTint(0xff0000);
+      }
       this.gameOver = true;
 
       // 显示游戏结束文字
@@ -1450,34 +1330,37 @@ export default class CoinChaserScene extends Phaser.Scene {
         this.gameWon = false;
         this.player1Coins = 0;
         this.player2Coins = 0;
-        this.player3Coins = 0;
         this.isInvincible = false;
         this.cheatCodeInput = '';
         this.movingPlatformData = [];
         this.shieldGraphics = [];
         this.lightningGraphics = [];
         this.lightningTimers = [];
+        this.isInSelectionMode = true;
+        this.selectedCharacters = [];
+        this.selectionUI = [];
         
         // 然后重启场景
         this.scene.restart();
       });
     } else {
       // 重置玩家位置
-      this.player.setPosition(100, 500);
-      this.player.setVelocity(0, 0);
-      this.player2.setPosition(150, 500);
-      this.player2.setVelocity(0, 0);
-      this.player3.setPosition(200, 500);
-      this.player3.setVelocity(0, 0);
+      if (this.player) {
+        this.player.setPosition(100, 500);
+        this.player.setVelocity(0, 0);
+        this.player.setAlpha(0.5);
+      }
+      
+      if (this.player2) {
+        this.player2.setPosition(200, 500);
+        this.player2.setVelocity(0, 0);
+        this.player2.setAlpha(0.5);
+      }
       
       // 闪烁效果表示受伤
-      this.player.setAlpha(0.5);
-      this.player2.setAlpha(0.5);
-      this.player3.setAlpha(0.5);
       this.time.delayedCall(1000, () => {
-        this.player.setAlpha(1);
-        this.player2.setAlpha(1);
-        this.player3.setAlpha(1);
+        if (this.player) this.player.setAlpha(1);
+        if (this.player2) this.player2.setAlpha(1);
       });
     }
   }
@@ -1488,42 +1371,46 @@ export default class CoinChaserScene extends Phaser.Scene {
     this.fireEnemies.children.entries.forEach((enemy: any) => {
       if (enemy.active) {
         // 向玩家1发射火球
-        const angleTo1 = Phaser.Math.Angle.Between(
-          enemy.x,
-          enemy.y,
-          this.player.x,
-          this.player.y
-        );
-        
-        const fireball1 = this.fireballs.create(enemy.x, enemy.y, 'fireball');
-        fireball1.setVelocity(
-          Math.cos(angleTo1) * 150,
-          Math.sin(angleTo1) * 150
-        );
-        fireball1.setScale(1.5);
+        if (this.player) {
+          const angleTo1 = Phaser.Math.Angle.Between(
+            enemy.x,
+            enemy.y,
+            this.player.x,
+            this.player.y
+          );
+          
+          const fireball1 = this.fireballs.create(enemy.x, enemy.y, 'fireball');
+          fireball1.setVelocity(
+            Math.cos(angleTo1) * 150,
+            Math.sin(angleTo1) * 150
+          );
+          fireball1.setScale(1.5);
+        }
 
-        // 如果玩家2距离较远，也向玩家2发射
-        const distanceTo2 = Phaser.Math.Distance.Between(
-          enemy.x,
-          enemy.y,
-          this.player2.x,
-          this.player2.y
-        );
-        
-        if (distanceTo2 < 400) {
-          const angleTo2 = Phaser.Math.Angle.Between(
+        // 如果玩家2存在且距离较近，也向玩家2发射
+        if (this.player2) {
+          const distanceTo2 = Phaser.Math.Distance.Between(
             enemy.x,
             enemy.y,
             this.player2.x,
             this.player2.y
           );
           
-          const fireball2 = this.fireballs.create(enemy.x, enemy.y, 'fireball');
-          fireball2.setVelocity(
-            Math.cos(angleTo2) * 150,
-            Math.sin(angleTo2) * 150
-          );
-          fireball2.setScale(1.5);
+          if (distanceTo2 < 400) {
+            const angleTo2 = Phaser.Math.Angle.Between(
+              enemy.x,
+              enemy.y,
+              this.player2.x,
+              this.player2.y
+            );
+            
+            const fireball2 = this.fireballs.create(enemy.x, enemy.y, 'fireball');
+            fireball2.setVelocity(
+              Math.cos(angleTo2) * 150,
+              Math.sin(angleTo2) * 150
+            );
+            fireball2.setScale(1.5);
+          }
         }
       }
     });
@@ -1562,6 +1449,387 @@ export default class CoinChaserScene extends Phaser.Scene {
     } else {
       // 被喷火敌人撞到
       this.loseLife();
+    }
+  }
+
+  private showTitleScreen() {
+    // 标题
+    const titleText = this.add.text(400, 150, '🪙 金币追逐', {
+      fontSize: '72px',
+      color: '#ffd700',
+      fontFamily: 'Arial',
+      stroke: '#000000',
+      strokeThickness: 8
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
+
+    const subtitleText = this.add.text(400, 230, 'Coin Chaser', {
+      fontSize: '32px',
+      color: '#ffffff',
+      fontFamily: 'Arial',
+      stroke: '#000000',
+      strokeThickness: 4
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
+
+    const continueText = this.add.text(400, 400, '按任意键开始', {
+      fontSize: '28px',
+      color: '#00ff00',
+      fontFamily: 'Arial',
+      stroke: '#000000',
+      strokeThickness: 4
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
+
+    // 闪烁效果
+    this.tweens.add({
+      targets: continueText,
+      alpha: 0.3,
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+
+    // 缩放效果
+    this.tweens.add({
+      targets: titleText,
+      scale: 1.1,
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+
+    this.selectionUI.push(titleText as any, subtitleText as any, continueText as any);
+
+    // 监听任意键
+    this.input.keyboard!.once('keydown', () => {
+      this.clearSelectionUI();
+      this.showPlayerCountSelection();
+    });
+  }
+
+  private showPlayerCountSelection() {
+    // 标题
+    const titleText = this.add.text(400, 120, '选择玩家数量', {
+      fontSize: '48px',
+      color: '#ffffff',
+      fontFamily: 'Arial',
+      stroke: '#000000',
+      strokeThickness: 6
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
+
+    this.selectionUI.push(titleText as any);
+
+    // 创建选择卡片
+    const options = [
+      { count: 1, label: '单人游戏', icon: '👤', y: 260 },
+      { count: 2, label: '双人游戏', icon: '👥', y: 400 }
+    ];
+
+    options.forEach(option => {
+      const card = this.add.container(400, option.y).setDepth(200).setScrollFactor(0);
+
+      // 背景
+      const bg = this.add.graphics();
+      bg.fillStyle(0x2c3e50, 1);
+      bg.fillRoundedRect(-150, -50, 300, 100, 15);
+      bg.lineStyle(3, 0x3498db, 1);
+      bg.strokeRoundedRect(-150, -50, 300, 100, 15);
+
+      // 图标
+      const icon = this.add.text(-100, 0, option.icon, {
+        fontSize: '48px'
+      }).setOrigin(0.5);
+
+      // 文字
+      const label = this.add.text(20, 0, option.label, {
+        fontSize: '32px',
+        color: '#ffffff',
+        fontFamily: 'Arial'
+      }).setOrigin(0, 0.5);
+
+      card.add([bg, icon, label]);
+      card.setInteractive(new Phaser.Geom.Rectangle(-150, -50, 300, 100), Phaser.Geom.Rectangle.Contains);
+
+      // 鼠标悬停效果
+      card.on('pointerover', () => {
+        bg.clear();
+        bg.fillStyle(0x3498db, 1);
+        bg.fillRoundedRect(-150, -50, 300, 100, 15);
+        bg.lineStyle(3, 0x00d4ff, 1);
+        bg.strokeRoundedRect(-150, -50, 300, 100, 15);
+        this.tweens.add({
+          targets: card,
+          scale: 1.05,
+          duration: 200,
+          ease: 'Back.easeOut'
+        });
+        this.game.canvas.style.cursor = 'pointer';
+      });
+
+      card.on('pointerout', () => {
+        bg.clear();
+        bg.fillStyle(0x2c3e50, 1);
+        bg.fillRoundedRect(-150, -50, 300, 100, 15);
+        bg.lineStyle(3, 0x3498db, 1);
+        bg.strokeRoundedRect(-150, -50, 300, 100, 15);
+        this.tweens.add({
+          targets: card,
+          scale: 1,
+          duration: 200,
+          ease: 'Back.easeIn'
+        });
+        this.game.canvas.style.cursor = 'default';
+      });
+
+      card.on('pointerdown', () => {
+        this.playerCount = option.count;
+        this.clearSelectionUI();
+        this.showCharacterSelection();
+      });
+
+      this.selectionUI.push(card as any);
+    });
+
+    // 提示文字
+    const hintText = this.add.text(400, 540, '点击选择', {
+      fontSize: '20px',
+      color: '#aaaaaa',
+      fontFamily: 'Arial'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
+
+    this.selectionUI.push(hintText as any);
+  }
+
+  private showCharacterSelection() {
+    this.selectedCharacters = [];
+
+    const updateUI = () => {
+      this.clearSelectionUI();
+
+      // 标题
+      const titleText = this.add.text(400, 80, `选择角色 (${this.selectedCharacters.length}/${this.playerCount})`, {
+        fontSize: '42px',
+        color: '#ffffff',
+        fontFamily: 'Arial',
+        stroke: '#000000',
+        strokeThickness: 6
+      }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
+
+      this.selectionUI.push(titleText as any);
+
+      // 显示角色卡片
+      const startX = 400 - (this.characterOptions.length - 1) * 130;
+      this.characterOptions.forEach((char, index) => {
+        const x = startX + index * 260;
+        const y = 300;
+        const isSelected = this.selectedCharacters.includes(char.id);
+        const isDisabled = !isSelected && this.selectedCharacters.length >= this.playerCount;
+
+        const card = this.add.container(x, y).setDepth(200).setScrollFactor(0);
+
+        // 背景
+        const bg = this.add.graphics();
+        if (isSelected) {
+          bg.fillStyle(0x27ae60, 1);
+          bg.lineStyle(4, 0x2ecc71, 1);
+        } else if (isDisabled) {
+          bg.fillStyle(0x555555, 0.5);
+          bg.lineStyle(3, 0x777777, 1);
+        } else {
+          bg.fillStyle(0x2c3e50, 1);
+          bg.lineStyle(3, 0x3498db, 1);
+        }
+        bg.fillRoundedRect(-90, -140, 180, 280, 15);
+        bg.strokeRoundedRect(-90, -140, 180, 280, 15);
+
+        // 角色预览
+        const sprite = this.add.sprite(0, -60, char.texture).setScale(4);
+        if (isDisabled) {
+          sprite.setAlpha(0.3);
+        }
+
+        // 角色名
+        const name = this.add.text(0, 20, char.name, {
+          fontSize: '28px',
+          color: isDisabled ? '#888888' : char.color,
+          fontFamily: 'Arial',
+          fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        // 描述
+        const desc = this.add.text(0, 80, char.description, {
+          fontSize: '14px',
+          color: isDisabled ? '#666666' : '#ffffff',
+          fontFamily: 'Arial',
+          align: 'center',
+          wordWrap: { width: 160 }
+        }).setOrigin(0.5);
+
+        // 选中标记
+        let checkMark: Phaser.GameObjects.Text | null = null;
+        if (isSelected) {
+          checkMark = this.add.text(0, -120, '✓', {
+            fontSize: '36px',
+            color: '#ffffff'
+          }).setOrigin(0.5);
+        }
+
+        card.add([bg, sprite, name, desc]);
+        if (checkMark) card.add(checkMark);
+
+        if (!isDisabled) {
+          card.setInteractive(new Phaser.Geom.Rectangle(-90, -140, 180, 280), Phaser.Geom.Rectangle.Contains);
+
+          card.on('pointerover', () => {
+            if (!isSelected) {
+              bg.clear();
+              bg.fillStyle(0x3498db, 1);
+              bg.lineStyle(3, 0x00d4ff, 1);
+              bg.fillRoundedRect(-90, -140, 180, 280, 15);
+              bg.strokeRoundedRect(-90, -140, 180, 280, 15);
+            }
+            this.tweens.add({
+              targets: card,
+              scale: 1.05,
+              duration: 200,
+              ease: 'Back.easeOut'
+            });
+            this.game.canvas.style.cursor = 'pointer';
+          });
+
+          card.on('pointerout', () => {
+            if (!isSelected) {
+              bg.clear();
+              bg.fillStyle(0x2c3e50, 1);
+              bg.lineStyle(3, 0x3498db, 1);
+              bg.fillRoundedRect(-90, -140, 180, 280, 15);
+              bg.strokeRoundedRect(-90, -140, 180, 280, 15);
+            }
+            this.tweens.add({
+              targets: card,
+              scale: 1,
+              duration: 200,
+              ease: 'Back.easeIn'
+            });
+            this.game.canvas.style.cursor = 'default';
+          });
+
+          card.on('pointerdown', () => {
+            if (isSelected) {
+              // 取消选择
+              const idx = this.selectedCharacters.indexOf(char.id);
+              if (idx > -1) {
+                this.selectedCharacters.splice(idx, 1);
+              }
+            } else {
+              // 选择
+              this.selectedCharacters.push(char.id);
+            }
+            updateUI();
+          });
+        }
+
+        this.selectionUI.push(card as any);
+      });
+
+      // 开始按钮
+      if (this.selectedCharacters.length === this.playerCount) {
+        const startButton = this.add.container(400, 500).setDepth(200).setScrollFactor(0);
+
+        const buttonBg = this.add.graphics();
+        buttonBg.fillStyle(0x27ae60, 1);
+        buttonBg.fillRoundedRect(-100, -30, 200, 60, 10);
+        buttonBg.lineStyle(3, 0x2ecc71, 1);
+        buttonBg.strokeRoundedRect(-100, -30, 200, 60, 10);
+
+        const buttonText = this.add.text(0, 0, '开始游戏', {
+          fontSize: '28px',
+          color: '#ffffff',
+          fontFamily: 'Arial',
+          fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        startButton.add([buttonBg, buttonText]);
+        startButton.setInteractive(new Phaser.Geom.Rectangle(-100, -30, 200, 60), Phaser.Geom.Rectangle.Contains);
+
+        startButton.on('pointerover', () => {
+          buttonBg.clear();
+          buttonBg.fillStyle(0x2ecc71, 1);
+          buttonBg.fillRoundedRect(-100, -30, 200, 60, 10);
+          buttonBg.lineStyle(3, 0x27ae60, 1);
+          buttonBg.strokeRoundedRect(-100, -30, 200, 60, 10);
+          this.tweens.add({
+            targets: startButton,
+            scale: 1.1,
+            duration: 200,
+            ease: 'Back.easeOut'
+          });
+          this.game.canvas.style.cursor = 'pointer';
+        });
+
+        startButton.on('pointerout', () => {
+          buttonBg.clear();
+          buttonBg.fillStyle(0x27ae60, 1);
+          buttonBg.fillRoundedRect(-100, -30, 200, 60, 10);
+          buttonBg.lineStyle(3, 0x2ecc71, 1);
+          buttonBg.strokeRoundedRect(-100, -30, 200, 60, 10);
+          this.tweens.add({
+            targets: startButton,
+            scale: 1,
+            duration: 200,
+            ease: 'Back.easeIn'
+          });
+          this.game.canvas.style.cursor = 'default';
+        });
+
+        startButton.on('pointerdown', () => {
+          this.clearSelectionUI();
+          this.cameras.main.fadeOut(500, 0, 0, 0);
+          this.cameras.main.once('camerafadeoutcomplete', () => {
+            this.cameras.main.fadeIn(500, 0, 0, 0);
+            this.startGame();
+          });
+        });
+
+        this.selectionUI.push(startButton as any);
+      }
+    };
+
+    updateUI();
+  }
+
+  private clearSelectionUI() {
+    this.selectionUI.forEach(item => {
+      if (item && item.destroy) {
+        item.destroy();
+      }
+    });
+    this.selectionUI = [];
+  }
+
+  private createSelectedPlayers() {
+    // 根据选择的角色创建玩家
+    const char1 = this.selectedCharacters[0];
+    const char2 = this.selectedCharacters[1];
+
+    // 创建玩家1
+    const char1Data = this.characterOptions.find(c => c.id === char1)!;
+    this.player = this.physics.add.sprite(100, 500, char1Data.texture);
+    this.player.setBounce(0.1);
+    this.player.setCollideWorldBounds(true);
+    this.player.setScale(2);
+    
+    // 设置相机边界和初始位置
+    this.cameras.main.setBounds(0, 0, 800, 1200);
+    this.cameras.main.scrollY = 0;
+
+    // 如果是双人游戏，创建玩家2
+    if (this.playerCount === 2 && char2) {
+      const char2Data = this.characterOptions.find(c => c.id === char2)!;
+      this.player2 = this.physics.add.sprite(200, 500, char2Data.texture);
+      this.player2.setBounce(0.1);
+      this.player2.setCollideWorldBounds(true);
+      this.player2.setScale(2);
     }
   }
 }

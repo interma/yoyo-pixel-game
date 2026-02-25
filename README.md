@@ -1,12 +1,24 @@
-# 🎮 像素平台跳跃游戏
+# 🎮 像素游戏合集
 
-一款基于 Phaser 3 和 TypeScript 开发的复古风格 2D 平台跳跃游戏，灵感来自经典的 8-bit/16-bit 游戏。
+一个基于 Phaser 3 和 TypeScript 开发的复古风格游戏合集项目，灵感来自经典的 8-bit/16-bit 游戏。
 
 ![游戏风格](https://img.shields.io/badge/风格-像素艺术-blue)
 ![引擎](https://img.shields.io/badge/引擎-Phaser%203-green)
 ![语言](https://img.shields.io/badge/语言-TypeScript-blue)
 
+## 🕹️ 游戏列表
+
+### 1️⃣ 金币追逐 (Coin Chaser)
+经典横板平台跳跃收集游戏，支持三人协作。
+
+> 更多游戏正在开发中...
+
 ## 🌟 游戏特色
+
+### 🎯 游戏选择菜单
+- **现代化界面**：精美的游戏选择卡片
+- **便捷导航**：点击卡片或按 ESC 键在游戏间切换
+- **可扩展**：便于添加更多游戏
 
 ### 🎨 经典复古风格
 - **8位像素艺术**图形，完全由程序生成
@@ -109,6 +121,7 @@ npm run build
 - 💡 移动平台上的角色和金币会随平台一起移动
 - 💡 输入秘籍可以激活特殊效果
 - 💡 游戏结束或胜利后按 **R** 键重新开始
+- 💡 按 **ESC** 键或点击右上角按钮返回游戏菜单
 
 ## 🛠️ 技术栈
 
@@ -125,7 +138,8 @@ pixel-platformer/
 ├── public/              # 静态资源
 ├── src/
 │   ├── scenes/
-│   │   └── CoinChaserScene.ts # 金币收集平台跳跃游戏
+│   │   ├── MenuScene.ts        # 游戏选择菜单
+│   │   └── CoinChaserScene.ts  # 金币收集平台跳跃游戏
 │   ├── main.ts          # 游戏初始化
 │   └── style.css        # 样式文件
 ├── index.html           # 入口HTML
@@ -147,7 +161,22 @@ pixel-platformer/
 
 ## 🔧 开发指南
 
-### 添加新功能
+### 添加新游戏
+1. 在 `src/scenes/` 中创建新的场景类（继承自 `Phaser.Scene`）
+2. 在 `src/main.ts` 中导入并添加到场景列表
+3. 在 `src/scenes/MenuScene.ts` 的 `games` 数组中添加游戏信息：
+```typescript
+{
+  name: '游戏名称',
+  nameEn: 'Game Name',
+  description: '游戏描述',
+  scene: 'YourSceneName',
+  color: 0xff6b6b,
+  icon: '🎮'
+}
+```
+
+### 修改现有游戏
 主要游戏逻辑位于 `src/scenes/CoinChaserScene.ts`，关键方法：
 - `preload()`: 加载/生成资源
 - `create()`: 初始化游戏对象

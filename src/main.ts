@@ -1,5 +1,6 @@
 import './style.css';
 import Phaser from 'phaser';
+import MenuScene from './scenes/MenuScene';
 import CoinChaserScene from './scenes/CoinChaserScene';
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -15,7 +16,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false
     }
   },
-  scene: [CoinChaserScene],
+  scene: [MenuScene, CoinChaserScene],
   pixelArt: true, // 启用像素艺术模式，保持像素清晰
   scale: {
     mode: Phaser.Scale.FIT,
