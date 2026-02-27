@@ -5,6 +5,8 @@ import { createAllCharacterTextures } from '../characters';
 import { createEnemyTextures, createCoinTexture } from '../common/GameAssets';
 import { setupCheatListener, CHEAT_CODES } from '../common/CheatSystem';
 import { TouchControls, createStandardControls } from '../common/TouchControls';
+import { getSoundManager } from '../common/SoundSystem';
+import { TEXT_STYLES } from '../common/UIConfig';
 
 export default class CoinChaserScene extends Phaser.Scene {
   private player!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody;
@@ -46,6 +48,25 @@ export default class CoinChaserScene extends Phaser.Scene {
     super({ key: 'CoinChaserScene' });
   }
 
+  init() {
+    // 重置所有状态变量，确保场景重启时状态正确
+    this.score = 0;
+    this.lives = 3;
+    this.player1Coins = 0;
+    this.player2Coins = 0;
+    this.gameOver = false;
+    this.gameWon = false;
+    this.isInvincible = false;
+    this.movingPlatformData = [];
+    this.shieldGraphics = [];
+    this.lightningGraphics = [];
+    this.lightningTimers = [];
+    this.isInSelectionMode = true;
+    this.playerCount = 2;
+    this.selectedCharacters = [];
+    this.selectionUI = [];
+  }
+
   preload() {
     // 由于我们没有外部图片资源，使用代码生成像素风格的图形
     this.createPixelAssets();
@@ -54,6 +75,10 @@ export default class CoinChaserScene extends Phaser.Scene {
   }
 
   create() {
+    // 初始化音效管理器并播放背景音乐
+    const soundManager = getSoundManager();
+    soundManager.playBackgroundMusicHappy();
+
     // 创建索尼克风格渐变背景
     this.createSonicBackground();
 
@@ -135,6 +160,7 @@ export default class CoinChaserScene extends Phaser.Scene {
 
     // ESC键返回菜单
     this.input.keyboard!.on('keydown-ESC', () => {
+      getSoundManager().stopBackgroundMusic();
       this.cameras.main.fadeOut(300, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
         this.scene.start('MenuScene');
@@ -260,6 +286,7 @@ export default class CoinChaserScene extends Phaser.Scene {
       const touchJump = this.touchControls.isButtonPressed('jump');
       if ((this.cursors.up.isDown || touchJump) && this.player.body.touching.down) {
         this.player.setVelocityY(-500);
+        getSoundManager().playJump();
       }
 
       // 玩家1飞行（长按F键 + 触摸飞行按钮）
@@ -769,20 +796,12 @@ export default class CoinChaserScene extends Phaser.Scene {
   private createUI() {
     // 分数文字
     this.scoreText = this.add.text(16, 16, 'Score: 0', {
-      fontSize: '24px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
-      strokeThickness: 4
+      ...TEXT_STYLES.HUD
     }).setScrollFactor(0).setDepth(100);
 
     // 生命值文字
     this.livesText = this.add.text(16, 50, 'Lives: ❤️❤️❤️', {
-      fontSize: '24px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
-      strokeThickness: 4
+      ...TEXT_STYLES.HUD
     }).setScrollFactor(0).setDepth(100);
 
     // 提示文字 - 根据实际玩家数量显示
@@ -800,18 +819,13 @@ export default class CoinChaserScene extends Phaser.Scene {
     }
 
     this.add.text(400, 16, controlsText, {
-      fontSize: '16px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
+      ...TEXT_STYLES.SMALL,
       strokeThickness: 3
     }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(100);
 
     // 返回菜单按钮
     const backButton = this.add.text(780, 16, '⬅ 菜单', {
-      fontSize: '20px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
+      ...TEXT_STYLES.BODY,
       backgroundColor: '#ff6b6b',
       padding: { x: 12, y: 6 }
     }).setOrigin(1, 0).setScrollFactor(0).setDepth(100).setInteractive();
@@ -827,6 +841,7 @@ export default class CoinChaserScene extends Phaser.Scene {
     });
 
     backButton.on('pointerdown', () => {
+      getSoundManager().stopBackgroundMusic();
       this.cameras.main.fadeOut(300, 0, 0, 0);
       this.cameras.main.once('camerafadeoutcomplete', () => {
         this.scene.start('MenuScene');
@@ -842,6 +857,7 @@ export default class CoinChaserScene extends Phaser.Scene {
     this.player1Coins++;
     this.score += 10;
     this.scoreText.setText('Score: ' + this.score);
+    getSoundManager().playCoin();
 
     // 检查是否所有金币都收集完了
     if (this.coins.countActive(true) === 0) {
@@ -857,6 +873,7 @@ export default class CoinChaserScene extends Phaser.Scene {
     this.player2Coins++;
     this.score += 10;
     this.scoreText.setText('Score: ' + this.score);
+    getSoundManager().playCoin();
 
     // 检查是否所有金币都收集完了
     if (this.coins.countActive(true) === 0) {
@@ -866,6 +883,7 @@ export default class CoinChaserScene extends Phaser.Scene {
 
   private activateInvincibility() {
     this.isInvincible = true;
+    getSoundManager().playPowerUp();
 
     // 为存在的玩家创建光盾
     const players: Array<{player: any, color: number}> = [];
@@ -1004,11 +1022,8 @@ export default class CoinChaserScene extends Phaser.Scene {
 
     // 提示文本
     const invincibleText = this.add.text(400, 100, 'INVINCIBLE!', {
-      fontSize: '32px',
-      color: '#00ffff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
-      strokeThickness: 4
+      ...TEXT_STYLES.TITLE_MEDIUM,
+      color: '#00ffff'
     }).setOrigin(0.5).setScrollFactor(0).setDepth(100);
 
     // 文本闪烁效果
@@ -1046,10 +1061,8 @@ export default class CoinChaserScene extends Phaser.Scene {
       
       // 显示结束提示
       const endText = this.add.text(400, 100, 'Invincibility ended', {
-        fontSize: '24px',
+        ...TEXT_STYLES.HUD,
         color: '#ffff00',
-        fontFamily: 'Arial',
-        stroke: '#000000',
         strokeThickness: 3
       }).setOrigin(0.5).setScrollFactor(0).setDepth(100);
 
@@ -1062,6 +1075,8 @@ export default class CoinChaserScene extends Phaser.Scene {
   private showVictory() {
     this.gameWon = true;
     this.physics.pause();
+    getSoundManager().stopBackgroundMusic();
+    getSoundManager().playVictory();
 
     // 背景覆盖层
     const overlay = this.add.graphics();
@@ -1072,10 +1087,9 @@ export default class CoinChaserScene extends Phaser.Scene {
 
     // 胜利文字
     const victoryText = this.add.text(400, 200, '🏆 Victory! 🏆', {
+      ...TEXT_STYLES.TITLE_LARGE,
       fontSize: '72px',
       color: '#ffd700',
-      fontFamily: 'Arial',
-      stroke: '#000000',
       strokeThickness: 8
     }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
@@ -1091,11 +1105,7 @@ export default class CoinChaserScene extends Phaser.Scene {
 
     // 最终分数
     this.add.text(400, 280, 'Final Score: ' + this.score, {
-      fontSize: '36px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
-      strokeThickness: 4
+      ...TEXT_STYLES.TITLE_MEDIUM
     }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
     // 创建排行榜 - 只显示实际参与的玩家
@@ -1118,10 +1128,8 @@ export default class CoinChaserScene extends Phaser.Scene {
     if (this.playerCount === 2) {
       // 显示排行榜标题
       this.add.text(400, 340, 'Coin Rankings:', {
-        fontSize: '28px',
+        ...TEXT_STYLES.TITLE_SMALL,
         color: '#ffff00',
-        fontFamily: 'Arial',
-        stroke: '#000000',
         strokeThickness: 3
       }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
@@ -1131,31 +1139,24 @@ export default class CoinChaserScene extends Phaser.Scene {
         const yPos = 385 + index * 35;
         const medal = medals[index] || '';
         this.add.text(400, yPos, `${medal} ${rank.name}: ${rank.coins} coins`, {
-          fontSize: '24px',
+          ...TEXT_STYLES.HUD,
           color: rank.color,
-          fontFamily: 'Arial',
-          stroke: '#000000',
           strokeThickness: 3
         }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
       });
     } else {
       // 单人游戏只显示金币数
       this.add.text(400, 360, `${rankings[0].name}收集了 ${rankings[0].coins} 个金币！`, {
-        fontSize: '28px',
+        ...TEXT_STYLES.TITLE_SMALL,
         color: rankings[0].color,
-        fontFamily: 'Arial',
-        stroke: '#000000',
         strokeThickness: 3
       }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
     }
 
     // 重启提示
     const restartText = this.add.text(400, 510, 'Press R to Play Again', {
-      fontSize: '24px',
-      color: '#00ff00',
-      fontFamily: 'Arial',
-      stroke: '#000000',
-      strokeThickness: 4
+      ...TEXT_STYLES.SUBTITLE,
+      color: '#00ff00'
     }).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
     // 闪烁效果
@@ -1200,6 +1201,7 @@ export default class CoinChaserScene extends Phaser.Scene {
       enemy.disableBody(true, true);
       this.score += 20;
       this.scoreText.setText('Score: ' + this.score);
+      getSoundManager().playEnemyDefeat();
       return;
     }
 
@@ -1210,8 +1212,10 @@ export default class CoinChaserScene extends Phaser.Scene {
       player.setVelocityY(-300);
       this.score += 20;
       this.scoreText.setText('Score: ' + this.score);
+      getSoundManager().playEnemyDefeat();
     } else {
       // 被敌人撞到
+      getSoundManager().playHit();
       this.loseLife();
     }
   }
@@ -1233,30 +1237,24 @@ export default class CoinChaserScene extends Phaser.Scene {
         this.player.setTint(0xff0000);
       }
       this.gameOver = true;
+      getSoundManager().stopBackgroundMusic();
+      getSoundManager().playGameOver();
 
       // 显示游戏结束文字
       this.add.text(400, 300, 'Game Over!', {
+        ...TEXT_STYLES.TITLE_LARGE,
         fontSize: '64px',
         color: '#ff0000',
-        fontFamily: 'Arial',
-        stroke: '#000000',
         strokeThickness: 8
       }).setOrigin(0.5);
 
       this.add.text(400, 370, 'Final Score: ' + this.score, {
-        fontSize: '32px',
-        color: '#ffffff',
-        fontFamily: 'Arial',
-        stroke: '#000000',
-        strokeThickness: 4
+        ...TEXT_STYLES.TITLE_MEDIUM
       }).setOrigin(0.5);
 
       const restartText = this.add.text(400, 420, 'Press R to Restart', {
-        fontSize: '24px',
-        color: '#ffff00',
-        fontFamily: 'Arial',
-        stroke: '#000000',
-        strokeThickness: 4
+        ...TEXT_STYLES.SUBTITLE,
+        color: '#ffff00'
       }).setOrigin(0.5);
 
       // 闪烁效果
@@ -1404,25 +1402,19 @@ export default class CoinChaserScene extends Phaser.Scene {
     const titleText = this.add.text(400, 150, '🪙 金币追逐', {
       fontSize: '72px',
       color: '#ffd700',
-      fontFamily: 'Arial',
+      fontFamily: 'Courier New, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif',
+      padding: { top: 10, bottom: 10, left: 5, right: 5 },
       stroke: '#000000',
       strokeThickness: 8
     }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
 
     const subtitleText = this.add.text(400, 230, 'Coin Chaser', {
-      fontSize: '32px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
-      strokeThickness: 4
+      ...TEXT_STYLES.TITLE_MEDIUM
     }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
 
     const continueText = this.add.text(400, 400, '按任意键开始', {
-      fontSize: '28px',
-      color: '#00ff00',
-      fontFamily: 'Arial',
-      stroke: '#000000',
-      strokeThickness: 4
+      ...TEXT_STYLES.TITLE_SMALL,
+      color: '#00ff00'
     }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
 
     // 闪烁效果
@@ -1447,20 +1439,26 @@ export default class CoinChaserScene extends Phaser.Scene {
 
     this.selectionUI.push(titleText as any, subtitleText as any, continueText as any);
 
-    // 监听任意键
-    this.input.keyboard!.once('keydown', () => {
+    // 定义继续游戏的处理函数
+    const handleContinue = () => {
       this.clearSelectionUI();
-      this.showPlayerCountSelection();
-    });
+      // 延迟显示选择界面，确保当前点击事件完全结束
+      this.time.delayedCall(50, () => {
+        this.showPlayerCountSelection();
+      });
+    };
+
+    // 监听任意键
+    this.input.keyboard!.once('keydown', handleContinue);
+    
+    // 监听鼠标点击和触摸事件
+    this.input.once('pointerdown', handleContinue);
   }
 
   private showPlayerCountSelection() {
     // 标题
     const titleText = this.add.text(400, 120, '选择玩家数量', {
-      fontSize: '48px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
+      ...TEXT_STYLES.TITLE_LARGE,
       strokeThickness: 6
     }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
 
@@ -1489,9 +1487,7 @@ export default class CoinChaserScene extends Phaser.Scene {
 
       // 文字
       const label = this.add.text(20, 0, option.label, {
-        fontSize: '32px',
-        color: '#ffffff',
-        fontFamily: 'Arial'
+        ...TEXT_STYLES.TITLE_MEDIUM
       }).setOrigin(0, 0.5);
 
       card.add([bg, icon, label]);
@@ -1539,9 +1535,8 @@ export default class CoinChaserScene extends Phaser.Scene {
 
     // 提示文字
     const hintText = this.add.text(400, 540, '点击选择', {
-      fontSize: '20px',
-      color: '#aaaaaa',
-      fontFamily: 'Arial'
+      ...TEXT_STYLES.BODY,
+      color: '#aaaaaa'
     }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
 
     this.selectionUI.push(hintText as any);
@@ -1555,10 +1550,8 @@ export default class CoinChaserScene extends Phaser.Scene {
 
       // 标题
       const titleText = this.add.text(400, 80, `选择角色 (${this.selectedCharacters.length}/${this.playerCount})`, {
+        ...TEXT_STYLES.TITLE_LARGE,
         fontSize: '42px',
-        color: '#ffffff',
-        fontFamily: 'Arial',
-        stroke: '#000000',
         strokeThickness: 6
       }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
 
@@ -1597,17 +1590,16 @@ export default class CoinChaserScene extends Phaser.Scene {
 
         // 角色名
         const name = this.add.text(0, 20, char.name, {
-          fontSize: '28px',
+          ...TEXT_STYLES.TITLE_SMALL,
           color: isDisabled ? '#888888' : char.color,
-          fontFamily: 'Arial',
           fontStyle: 'bold'
         }).setOrigin(0.5);
 
         // 描述
         const desc = this.add.text(0, 80, char.description, {
+          ...TEXT_STYLES.SMALL,
           fontSize: '14px',
           color: isDisabled ? '#666666' : '#ffffff',
-          fontFamily: 'Arial',
           align: 'center',
           wordWrap: { width: 160 }
         }).setOrigin(0.5);
@@ -1690,9 +1682,7 @@ export default class CoinChaserScene extends Phaser.Scene {
         buttonBg.strokeRoundedRect(-100, -30, 200, 60, 10);
 
         const buttonText = this.add.text(0, 0, '开始游戏', {
-          fontSize: '28px',
-          color: '#ffffff',
-          fontFamily: 'Arial',
+          ...TEXT_STYLES.TITLE_SMALL,
           fontStyle: 'bold'
         }).setOrigin(0.5);
 

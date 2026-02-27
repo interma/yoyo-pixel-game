@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { TEXT_STYLES } from '../common/UIConfig';
 
 export default class MenuScene extends Phaser.Scene {
   constructor() {
@@ -15,17 +16,13 @@ export default class MenuScene extends Phaser.Scene {
 
     // 标题
     this.add.text(width / 2, 80, '👾 YoYo的像素冒险', {
+      ...TEXT_STYLES.TITLE_LARGE,
       fontSize: '56px',
-      color: '#00d4ff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
-      strokeThickness: 6
+      color: '#00d4ff'
     }).setOrigin(0.5);
 
     this.add.text(width / 2, 140, 'Game Collection', {
-      fontSize: '20px',
-      color: '#ffffff',
-      fontFamily: 'Arial'
+      ...TEXT_STYLES.BODY
     }).setOrigin(0.5).setAlpha(0.7);
 
     // 游戏列表
@@ -58,11 +55,32 @@ export default class MenuScene extends Phaser.Scene {
     });
 
     // 底部提示
-    this.add.text(width / 2, height - 40, '点击卡片开始游戏 · Click to Start', {
-      fontSize: '16px',
-      color: '#888888',
-      fontFamily: 'Arial'
+    this.add.text(width / 2, height - 60, '点击卡片开始游戏 · Click to Start', {
+      ...TEXT_STYLES.SMALL,
+      color: '#888888'
     }).setOrigin(0.5);
+
+    // GitHub 链接
+    const githubLink = this.add.text(width / 2, height - 30, 'github.com/interma/pixel-yoyo-game', {
+      ...TEXT_STYLES.LINK,
+      fontSize: '14px',
+      color: '#00d4ff'
+    }).setOrigin(0.5);
+
+    // 设置为可交互并添加点击效果
+    githubLink.setInteractive({ useHandCursor: true });
+    
+    githubLink.on('pointerover', () => {
+      githubLink.setStyle({ color: '#00ffff' });
+    });
+    
+    githubLink.on('pointerout', () => {
+      githubLink.setStyle({ color: '#00d4ff' });
+    });
+    
+    githubLink.on('pointerdown', () => {
+      window.open('https://github.com/interma/pixel-yoyo-game', '_blank');
+    });
   }
 
   createGameCard(game: any, x: number, y: number, height: number) {
@@ -90,30 +108,26 @@ export default class MenuScene extends Phaser.Scene {
 
     // 游戏名称
     const title = this.add.text(-cardWidth / 2 + 120, -15, game.name, {
+      ...TEXT_STYLES.TITLE_MEDIUM,
       fontSize: '32px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
       fontStyle: 'bold'
     }).setOrigin(0, 0.5);
 
     const titleEn = this.add.text(-cardWidth / 2 + 120, 15, game.nameEn, {
-      fontSize: '16px',
-      color: '#aaaaaa',
-      fontFamily: 'Arial'
+      ...TEXT_STYLES.SMALL,
+      color: '#aaaaaa'
     }).setOrigin(0, 0.5);
 
     // 描述
     const desc = this.add.text(-cardWidth / 2 + 120, 40, game.description, {
+      ...TEXT_STYLES.SMALL,
       fontSize: '14px',
-      color: '#888888',
-      fontFamily: 'Arial'
+      color: '#888888'
     }).setOrigin(0, 0.5);
 
     // 播放按钮
     const playBtn = this.add.text(cardWidth / 2 - 80, 0, '开始 ▶', {
-      fontSize: '24px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
+      ...TEXT_STYLES.HUD,
       backgroundColor: '#00d4ff',
       padding: { x: 20, y: 10 }
     }).setOrigin(0.5);

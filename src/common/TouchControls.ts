@@ -120,7 +120,8 @@ export class TouchControls {
     const text = this.scene.add.text(config.x, config.y, config.label, {
       fontSize: '20px',
       color: '#ffffff',
-      fontFamily: 'Arial',
+      fontFamily: 'Courier New, "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif',
+      padding: { top: 10, bottom: 10, left: 5, right: 5 },
       fontStyle: 'bold'
     });
     text.setOrigin(0.5);

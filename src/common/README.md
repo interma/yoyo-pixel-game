@@ -4,7 +4,174 @@
 
 ## 📦 模块列表
 
-### 1. TouchControls.ts - 移动端触摸控制 🆕
+### 1. UIConfig.ts - UI配置系统 🆕
+
+集中管理游戏UI的字体、颜色、边距等样式配置，确保整个游戏的视觉风格统一。
+
+**主要配置：**
+
+```typescript
+// 字体配置
+FONTS.PRIMARY     // 主字体（等宽+中文字体栈）
+FONTS.SECONDARY   // 备用字体
+
+// 文字边距
+TEXT_PADDING.STANDARD  // 标准边距 (10, 10, 5, 5)
+TEXT_PADDING.COMPACT   // 紧凑边距 (8, 8, 4, 4)
+TEXT_PADDING.RELAXED   // 宽松边距 (12, 12, 6, 6)
+TEXT_PADDING.NONE      // 无边距
+
+// 文字描边
+TEXT_STROKE.STANDARD   // 标准描边 (4px)
+TEXT_STROKE.THICK      // 粗描边 (6px)
+TEXT_STROKE.THIN       // 细描边 (2px)
+
+// 颜色
+COLORS.PRIMARY         // 主色调 (#ffffff)
+COLORS.SUCCESS         // 成功 (#00ff00)
+COLORS.ERROR           // 错误 (#ff0000)
+COLORS.INFO            // 信息 (#00d4ff)
+
+// 文字样式预设
+TEXT_STYLES.TITLE_LARGE   // 大标题 (48px)
+TEXT_STYLES.TITLE_MEDIUM  // 中标题 (36px)
+TEXT_STYLES.TITLE_SMALL   // 小标题 (28px)
+TEXT_STYLES.SUBTITLE      // 副标题 (24px)
+TEXT_STYLES.BODY          // 正文 (20px)
+TEXT_STYLES.SMALL         // 小字 (16px)
+TEXT_STYLES.HUD           // HUD文本 (24px)
+TEXT_STYLES.LINK          // 链接 (16px)
+```
+
+**使用示例：**
+
+```typescript
+import { TEXT_STYLES, COLORS } from '../common/UIConfig';
+
+class MyScene extends Phaser.Scene {
+  create() {
+    // 使用预设样式
+    this.add.text(400, 100, 'Game Title', TEXT_STYLES.TITLE_LARGE)
+      .setOrigin(0.5);
+    
+    // 自定义颜色
+    this.add.text(400, 200, 'Start Game', {
+      ...TEXT_STYLES.BODY,
+      color: COLORS.SUCCESS
+    }).setOrigin(0.5);
+    
+    // HUD文本
+    this.scoreText = this.add.text(16, 16, 'Score: 0', TEXT_STYLES.HUD);
+  }
+}
+```
+
+---
+
+### 2. SoundSystem.ts - 音效系统
+
+使用 Web Audio API 程序化生成复古风格音效和背景音乐。
+
+**主要类：**
+
+```typescript
+class SoundManager {
+  // 音效播放
+  playJump(): void              // 跳跃音效
+  playCoin(): void              // 收集金币音效
+  playHit(): void               // 敌人碰撞音效
+  playVictory(): void           // 游戏胜利音效
+  playGameOver(): void          // 游戏失败音效
+  playEnemyDefeat(): void       // 击败敌人音效
+  playPowerUp(): void           // 护盾激活音效
+  
+  // 背景音乐
+  playBackgroundMusicHappy(): void   // 欢快风格BGM（金币追逐）
+  playBackgroundMusicTense(): void   // 紧张风格BGM（古堡逃亡）
+  stopBackgroundMusic(): void        // 停止背景音乐
+  
+  // 音量控制
+  setMasterVolume(volume: number): void  // 设置主音量 (0-1)
+  setMusicVolume(volume: number): void   // 设置音乐音量 (0-1)
+  setSfxVolume(volume: number): void     // 设置音效音量 (0-1)
+  toggleMute(): void                     // 静音/取消静音
+  
+  // 资源管理
+  destroy(): void                        // 清理资源
+}
+
+// 获取全局音效管理器单例
+getSoundManager(): SoundManager
+```
+
+**使用示例：**
+
+```typescript
+import { getSoundManager } from '../common/SoundSystem';
+
+class MyScene extends Phaser.Scene {
+  create() {
+    // 初始化音效管理器并播放背景音乐
+    const soundManager = getSoundManager();
+    soundManager.playBackgroundMusicHappy();
+  }
+  
+  update() {
+    // 在跳跃时播放音效
+    if (this.cursors.up.isDown && this.player.body.touching.down) {
+      this.player.setVelocityY(-500);
+      getSoundManager().playJump();
+    }
+  }
+  
+  collectCoin(player: any, coin: any) {
+    coin.disableBody(true, true);
+    this.score += 10;
+    getSoundManager().playCoin();  // 收集金币音效
+  }
+  
+  hitEnemy(player: any, enemy: any) {
+    if (this.isInvincible) {
+      enemy.disableBody(true, true);
+      getSoundManager().playEnemyDefeat();
+    } else {
+      getSoundManager().playHit();
+      this.loseLife();
+    }
+  }
+  
+  showVictory() {
+    this.gameWon = true;
+    getSoundManager().stopBackgroundMusic();
+    getSoundManager().playVictory();
+  }
+}
+```
+
+**音量控制示例：**
+
+```typescript
+const soundManager = getSoundManager();
+
+// 设置不同的音量级别
+soundManager.setMasterVolume(0.5);   // 50% 总音量
+soundManager.setMusicVolume(0.3);    // 30% 音乐音量
+soundManager.setSfxVolume(0.7);      // 70% 音效音量
+
+// 静音/取消静音
+soundManager.toggleMute();
+```
+
+**音效特点：**
+- ✅ **零依赖**：完全程序化生成，无需外部音频文件
+- 🎵 **复古风格**：8位/16位游戏风格的音效
+- 🔊 **独立音量**：背景音乐和音效独立控制
+- 🎮 **自动平衡**：预设合理的音量默认值
+- 🌐 **兼容性强**：基于 Web Audio API，现代浏览器全支持
+
+---
+
+### 2. TouchControls.ts - 移动端触摸控制
 
 为移动设备提供虚拟摇杆和按钮控制。
 
@@ -89,7 +256,7 @@ controls.createButton({
 
 ---
 
-### 2. GameAssets.ts - 游戏资源创建
+### 3. GameAssets.ts - 游戏资源创建
 
 创建游戏中常用的纹理资源。
 
@@ -131,7 +298,7 @@ class MyScene extends Phaser.Scene {
 
 ---
 
-### 2. CheatSystem.ts - 秘籍系统
+### 4. CheatSystem.ts - 秘籍系统
 
 处理秘籍输入检测和相关功能。
 
@@ -201,7 +368,7 @@ interface FlyingControlConfig {
 
 ---
 
-### 3. InvincibilityShield.ts - 无敌护盾系统
+### 5. InvincibilityShield.ts - 无敌护盾系统
 
 处理无敌护盾的视觉效果和逻辑。
 

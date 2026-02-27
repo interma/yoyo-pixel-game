@@ -5,6 +5,8 @@ import { createAllCharacterTextures } from '../characters';
 import { createEnemyTextures } from '../common/GameAssets';
 import { setupCheatListener, CHEAT_CODES } from '../common/CheatSystem';
 import { TouchControls, createStandardControls } from '../common/TouchControls';
+import { getSoundManager } from '../common/SoundSystem';
+import { TEXT_STYLES } from '../common/UIConfig';
 
 export default class ScrollRunnerScene extends Phaser.Scene {
   private player!: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody;
@@ -43,6 +45,25 @@ export default class ScrollRunnerScene extends Phaser.Scene {
     super({ key: 'ScrollRunnerScene' });
   }
 
+  init() {
+    // 重置所有状态变量，确保场景重启时状态正确
+    this.score = 0;
+    this.lives = 3;
+    this.gameOver = false;
+    this.gameWon = false;
+    this.scrollSpeed = 200;
+    this.platformQueue = [];
+    this.lastPlatformX = 0;
+    this.distanceTraveled = 0;
+    this.isInvincible = false;
+    this.shieldGraphics = [];
+    this.isInSelectionMode = true;
+    this.playerCount = 1;
+    this.selectedCharacters = [];
+    this.selectionUI = [];
+    this.player2 = null;
+  }
+
   preload() {
     this.createPixelAssets();
     createAllCharacterTextures(this);
@@ -57,6 +78,10 @@ export default class ScrollRunnerScene extends Phaser.Scene {
   }
 
   private startGame() {
+    // 初始化音效管理器并播放紧张风格背景音乐
+    const soundManager = getSoundManager();
+    soundManager.playBackgroundMusicTense();
+
     // 初始化物理世界
     this.physics.world.setBounds(0, 0, 3200, 600);
 
@@ -115,6 +140,7 @@ export default class ScrollRunnerScene extends Phaser.Scene {
 
     // 监听返回菜单
     this.input.keyboard!.on('keydown-ESC', () => {
+      getSoundManager().stopBackgroundMusic();
       this.scene.start('MenuScene');
     });
   }
@@ -514,6 +540,7 @@ export default class ScrollRunnerScene extends Phaser.Scene {
       const touchJump = this.touchControls.isButtonPressed('jump');
       if ((this.cursors.up.isDown || touchJump) && this.player.body.touching.down) {
         this.player.setVelocityY(-450);
+        getSoundManager().playJump();
       }
 
       // 飞行（长按F键 + 触摸飞行按钮）
@@ -616,6 +643,8 @@ export default class ScrollRunnerScene extends Phaser.Scene {
   private endGame() {
     this.gameOver = true;
     this.physics.pause();
+    getSoundManager().stopBackgroundMusic();
+    getSoundManager().playGameOver();
 
     // 游戏结束画面
     const gameOverBg = this.add.graphics();
@@ -624,29 +653,23 @@ export default class ScrollRunnerScene extends Phaser.Scene {
     gameOverBg.setScrollFactor(0);
 
     void this.add.text(400, 200, '游戏结束', {
+      ...TEXT_STYLES.TITLE_LARGE,
       fontSize: '64px',
       color: '#ff0000',
-      fontFamily: 'Arial',
-      stroke: '#000000',
       strokeThickness: 8
     }).setOrigin(0.5).setScrollFactor(0);
 
     void this.add.text(400, 280, `最终距离: ${this.score}m`, {
-      fontSize: '32px',
-      color: '#ffffff',
-      fontFamily: 'Arial'
+      ...TEXT_STYLES.TITLE_MEDIUM
     }).setOrigin(0.5).setScrollFactor(0);
 
     void this.add.text(400, 360, '按 R 重新开始', {
-      fontSize: '24px',
-      color: '#00ff00',
-      fontFamily: 'Arial'
+      ...TEXT_STYLES.SUBTITLE,
+      color: '#00ff00'
     }).setOrigin(0.5).setScrollFactor(0);
 
     void this.add.text(400, 400, '按 ESC 返回菜单', {
-      fontSize: '24px',
-      color: '#ffffff',
-      fontFamily: 'Arial'
+      ...TEXT_STYLES.SUBTITLE
     }).setOrigin(0.5).setScrollFactor(0);
 
     // 重新开始
@@ -658,6 +681,8 @@ export default class ScrollRunnerScene extends Phaser.Scene {
   private showVictory() {
     this.gameWon = true;
     this.physics.pause();
+    getSoundManager().stopBackgroundMusic();
+    getSoundManager().playVictory();
 
     // 胜利画面
     const victoryBg = this.add.graphics();
@@ -667,44 +692,35 @@ export default class ScrollRunnerScene extends Phaser.Scene {
 
     // 胜利文字
     void this.add.text(400, 150, '🏰 胜利！', {
+      ...TEXT_STYLES.TITLE_LARGE,
       fontSize: '72px',
       color: '#ffd700',
-      fontFamily: 'Arial',
-      stroke: '#000000',
       strokeThickness: 8
     }).setOrigin(0.5).setScrollFactor(0);
 
     void this.add.text(400, 250, '成功到达古堡！', {
-      fontSize: '36px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
+      ...TEXT_STYLES.TITLE_MEDIUM,
       strokeThickness: 6
     }).setOrigin(0.5).setScrollFactor(0);
 
     void this.add.text(400, 320, `最终距离: ${this.score}m`, {
-      fontSize: '28px',
-      color: '#00ff00',
-      fontFamily: 'Arial'
+      ...TEXT_STYLES.TITLE_SMALL,
+      color: '#00ff00'
     }).setOrigin(0.5).setScrollFactor(0);
 
     void this.add.text(400, 400, '按 R 再玩一次', {
-      fontSize: '24px',
-      color: '#00ff00',
-      fontFamily: 'Arial'
+      ...TEXT_STYLES.SUBTITLE,
+      color: '#00ff00'
     }).setOrigin(0.5).setScrollFactor(0);
 
     void this.add.text(400, 440, '按 ESC 返回菜单', {
-      fontSize: '24px',
-      color: '#ffffff',
-      fontFamily: 'Arial'
+      ...TEXT_STYLES.SUBTITLE
     }).setOrigin(0.5).setScrollFactor(0);
 
     // 闪烁效果
     const victoryText = this.add.text(400, 500, '★ 完美通关 ★', {
-      fontSize: '32px',
+      ...TEXT_STYLES.TITLE_MEDIUM,
       color: '#ff6b35',
-      fontFamily: 'Arial',
       fontStyle: 'bold'
     }).setOrigin(0.5).setScrollFactor(0);
 
@@ -725,19 +741,11 @@ export default class ScrollRunnerScene extends Phaser.Scene {
 
   private createUI() {
     this.scoreText = this.add.text(16, 16, '距离: 0m', {
-      fontSize: '24px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
-      strokeThickness: 4
+      ...TEXT_STYLES.HUD
     }).setScrollFactor(0).setDepth(100);
 
     this.livesText = this.add.text(16, 50, 'Lives: ❤️❤️❤️', {
-      fontSize: '24px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
-      strokeThickness: 4
+      ...TEXT_STYLES.HUD
     }).setScrollFactor(0).setDepth(100);
     this.updateLivesText();
 
@@ -753,18 +761,13 @@ export default class ScrollRunnerScene extends Phaser.Scene {
     }
 
     this.add.text(400, 16, controlsText, {
-      fontSize: '16px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
+      ...TEXT_STYLES.SMALL,
       strokeThickness: 3
     }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(100);
 
     // 返回菜单按钮
     const backButton = this.add.text(780, 16, '⬅ 菜单', {
-      fontSize: '20px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
+      ...TEXT_STYLES.BODY,
       backgroundColor: '#ff6b6b',
       padding: { x: 12, y: 6 }
     }).setOrigin(1, 0).setScrollFactor(0).setDepth(100).setInteractive();
@@ -778,6 +781,7 @@ export default class ScrollRunnerScene extends Phaser.Scene {
     });
 
     backButton.on('pointerdown', () => {
+      getSoundManager().stopBackgroundMusic();
       this.scene.start('MenuScene');
     });
   }
@@ -785,27 +789,20 @@ export default class ScrollRunnerScene extends Phaser.Scene {
   // 标题画面和角色选择（复用CoinChaserScene的逻辑）
   private showTitleScreen() {
     const titleText = this.add.text(400, 150, '🏰 古堡逃亡', {
+      ...TEXT_STYLES.TITLE_LARGE,
       fontSize: '72px',
       color: '#ff6b35',
-      fontFamily: 'Arial',
-      stroke: '#000000',
       strokeThickness: 8
     }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
 
     const subtitleText = this.add.text(400, 230, 'Castle Escape', {
-      fontSize: '32px',
-      color: '#c99fff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
-      strokeThickness: 4
+      ...TEXT_STYLES.TITLE_MEDIUM,
+      color: '#c99fff'
     }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
 
     const continueText = this.add.text(400, 400, '按任意键开始', {
-      fontSize: '28px',
-      color: '#00ff00',
-      fontFamily: 'Arial',
-      stroke: '#000000',
-      strokeThickness: 4
+      ...TEXT_STYLES.TITLE_SMALL,
+      color: '#00ff00'
     }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
 
     this.tweens.add({
@@ -819,18 +816,25 @@ export default class ScrollRunnerScene extends Phaser.Scene {
 
     this.selectionUI.push(titleText as any, subtitleText as any, continueText as any);
 
-    this.input.keyboard!.once('keydown', () => {
+    // 定义继续游戏的处理函数
+    const handleContinue = () => {
       this.clearSelectionUI();
-      this.showPlayerCountSelection();
-    });
+      // 延迟显示选择界面，确保当前点击事件完全结束
+      this.time.delayedCall(50, () => {
+        this.showPlayerCountSelection();
+      });
+    };
+
+    // 监听任意键
+    this.input.keyboard!.once('keydown', handleContinue);
+    
+    // 监听鼠标点击和触摸事件
+    this.input.once('pointerdown', handleContinue);
   }
 
   private showPlayerCountSelection() {
     const titleText = this.add.text(400, 120, '选择玩家数量', {
-      fontSize: '48px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
+      ...TEXT_STYLES.TITLE_LARGE,
       strokeThickness: 6
     }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
 
@@ -855,9 +859,7 @@ export default class ScrollRunnerScene extends Phaser.Scene {
       }).setOrigin(0.5);
 
       const label = this.add.text(20, 0, option.label, {
-        fontSize: '32px',
-        color: '#ffffff',
-        fontFamily: 'Arial'
+        ...TEXT_STYLES.TITLE_MEDIUM
       }).setOrigin(0, 0.5);
 
       card.add([bg, icon, label]);
@@ -898,10 +900,8 @@ export default class ScrollRunnerScene extends Phaser.Scene {
       this.clearSelectionUI();
 
       const titleText = this.add.text(400, 80, `选择角色 (${this.selectedCharacters.length}/${this.playerCount})`, {
+        ...TEXT_STYLES.TITLE_LARGE,
         fontSize: '42px',
-        color: '#ffffff',
-        fontFamily: 'Arial',
-        stroke: '#000000',
         strokeThickness: 6
       }).setOrigin(0.5).setScrollFactor(0).setDepth(200);
 
@@ -934,16 +934,15 @@ export default class ScrollRunnerScene extends Phaser.Scene {
         if (isDisabled) sprite.setAlpha(0.3);
 
         const name = this.add.text(0, 20, char.name, {
-          fontSize: '28px',
+          ...TEXT_STYLES.TITLE_SMALL,
           color: isDisabled ? '#888888' : char.color,
-          fontFamily: 'Arial',
           fontStyle: 'bold'
         }).setOrigin(0.5);
 
         const desc = this.add.text(0, 80, char.description, {
+          ...TEXT_STYLES.SMALL,
           fontSize: '14px',
           color: isDisabled ? '#666666' : '#ffffff',
-          fontFamily: 'Arial',
           align: 'center',
           wordWrap: { width: 160 }
         }).setOrigin(0.5);
@@ -1008,9 +1007,7 @@ export default class ScrollRunnerScene extends Phaser.Scene {
         buttonBg.strokeRoundedRect(-100, -30, 200, 60, 10);
 
         const buttonText = this.add.text(0, 0, '开始游戏', {
-          fontSize: '28px',
-          color: '#ffffff',
-          fontFamily: 'Arial',
+          ...TEXT_STYLES.TITLE_SMALL,
           fontStyle: 'bold'
         }).setOrigin(0.5);
 
@@ -1225,6 +1222,7 @@ export default class ScrollRunnerScene extends Phaser.Scene {
       enemy.disableBody(true, true);
       this.score += 20;
       this.scoreText.setText('分数: ' + this.score);
+      getSoundManager().playEnemyDefeat();
       return;
     }
 
@@ -1235,8 +1233,10 @@ export default class ScrollRunnerScene extends Phaser.Scene {
       player.setVelocityY(-300);
       this.score += 20;
       this.scoreText.setText('分数: ' + this.score);
+      getSoundManager().playEnemyDefeat();
     } else {
       // 被敌人撞到
+      getSoundManager().playHit();
       this.loseLife();
     }
   }
@@ -1283,6 +1283,7 @@ export default class ScrollRunnerScene extends Phaser.Scene {
 
   private activateInvincibility() {
     this.isInvincible = true;
+    getSoundManager().playPowerUp();
 
     // 为存在的玩家创建光盾
     const players: Array<{player: any, color: number}> = [];
@@ -1355,10 +1356,8 @@ export default class ScrollRunnerScene extends Phaser.Scene {
 
     // 显示提示
     const invincibilityText = this.add.text(400, 150, '✨ 无敌护盾启动! ✨', {
-      fontSize: '32px',
+      ...TEXT_STYLES.TITLE_MEDIUM,
       color: '#ffd700',
-      fontFamily: 'Arial',
-      stroke: '#000000',
       strokeThickness: 6
     }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
 
@@ -1385,11 +1384,8 @@ export default class ScrollRunnerScene extends Phaser.Scene {
       
       // 显示结束提示
       const endText = this.add.text(400, 150, '护盾结束', {
-        fontSize: '24px',
-        color: '#ff6b6b',
-        fontFamily: 'Arial',
-        stroke: '#000000',
-        strokeThickness: 4
+        ...TEXT_STYLES.SUBTITLE,
+        color: '#ff6b6b'
       }).setOrigin(0.5).setScrollFactor(0).setDepth(1000);
 
       this.tweens.add({
